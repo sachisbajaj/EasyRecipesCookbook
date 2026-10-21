@@ -1,0 +1,12 @@
+{
+  "name": "easy-recipes-cookbook",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/data-model.test.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10"
+  }
+}
