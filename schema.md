@@ -1,12 +1,12 @@
 # EasyRecipesCookbook database
 
-This feature defines the first three tables in PLAN.md. The SQL source is `supabase/migrations/20261021000100_core_recipe_model.sql`.
+This feature defines the first three tables in PLAN.md. The SQL sources are `supabase/migrations/20261021000100_core_recipe_model.sql` and `supabase/migrations/20261021000200_auth_profiles.sql`.
 
 ## Relationships
 
 ```mermaid
 erDiagram
-    AUTH_USERS ||--o| USERS : has_profile
+    AUTH_USERS ||--|| USERS : has_profile
     USERS ||--o{ RECIPES : owns
     RECIPES ||--o{ INGREDIENTS : contains
 ```
@@ -21,7 +21,9 @@ Supabase manages `auth.users`, including authentication credentials. `public.use
 | display_name | text | Optional |
 | created_at | timestamptz | Required; defaults to current time |
 
-Authenticated users can create/read their own profile and update only its display name. Profile provisioning on signup will be added with the authentication feature. Users cannot delete their profile directly; account deletion is handled by the authentication service.
+The auth profile migration automatically creates exactly one profile after each auth.users insert and backfills missing profiles for existing accounts. Existing names are preserved. Authenticated clients may read their own profile and update only its display name; browser INSERT permission is removed. Users cannot delete their profile directly; account deletion is handled by the authentication service.
+
+The trigger runs a SECURITY DEFINER function with a fixed empty search_path and fully qualified table names. It is not executable by public, anon, or authenticated clients. It inserts only the account ID, never trusts user metadata for permissions, and lets database failures roll back account creation rather than silently losing the profile. The trigger is installed before the backfill in the same transaction. The primary key and ON CONFLICT prevent duplicates.
 
 ## recipes
 
@@ -70,4 +72,4 @@ Stars, cooking_notes, meal_plan_entries, and grocery_items remain planned. Their
 
 Run `pnpm install --frozen-lockfile` and `pnpm test`. Tests apply the migration to an isolated PGlite database, create two identities, and exercise SQL as the authenticated/anonymous roles. Coverage includes private reads/writes, guessed IDs, forbidden parent changes, validation, timestamps, and cascading deletion.
 
-The test-only auth schema and auth.uid() stand-in simulate identity supplied by Supabase. They do not test token verification, confirmation email, real signup, or the hosted API. Verify those against a development Supabase project during the authentication feature.
+The test-only auth schema and auth.uid() stand-in simulate identity supplied by Supabase. They do not test token verification, confirmation email, real signup, or the hosted API. The authentication feature includes additional simulated UI and browser tests; the real development-project checks remain pending until Supabase is configured. See README.md for the checklist.
