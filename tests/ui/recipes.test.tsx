@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { RecipePages } from '../../src/recipes/RecipePages';
 import { parseAmount, formatAmount, toDraft, toValues, validateDraft, type Recipe, type RecipeService } from '../../src/recipes/model';
 const recipe: Recipe = { id: '00000000-0000-0000-0000-000000000003', user_id: 'a', title: 'Gnocchi', instructions: 'Pan fry.', servings: 2, minutes: null, store: null, source_url: null, rating: null, created_at: '', updated_at: '', ingredients: [{ id: 'i', recipe_id: '', name: 'Gnocchi', quantity: 1, unit: 'bag', position: 0 }] };
-function service(): RecipeService { return { list: vi.fn(async () => [recipe]), get: vi.fn(async () => recipe), save: vi.fn(async () => recipe.id), remove: vi.fn(async () => {}) }; }
+function service(): RecipeService { return { list: vi.fn(async () => [recipe]), get: vi.fn(async () => recipe), save: vi.fn(async () => recipe.id), remove: vi.fn(async () => {}), setStar: vi.fn(async () => {}) }; }
 function show(s: RecipeService, route = '/cookbook') { return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/cookbook/*" element={<RecipePages service={s} owner="a"/>}/></Routes></MemoryRouter>); }
 it('lists only through the current owner and opens a full recipe', async () => {
   const s = service(); const user = userEvent.setup(); show(s);
@@ -105,4 +105,27 @@ it('rejects invalid optional values and nonfinite amounts without converting the
   for(const value of ['0','-1','1.5','NaN','Infinity','2147483648']) expect(validateDraft({...draft,minutes:value}).minutes).toBeTruthy();
   for(const value of ['NaN','Infinity','-Infinity','1/0','0/4','1/','-1/4']) expect(validateDraft({...draft,ingredients:[{...draft.ingredients[0],quantity:value}]})).toHaveProperty('i-quantity');
   for(const value of ['ftp://example.com','javascript:alert(1)','https://','https://a b.com']) expect(validateDraft({...draft,source_url:value}).source_url).toBeTruthy();
+});
+it('stars a recipe without opening its card and shows it in the Starred view', async () => {
+  const s=service(); let starred=false;
+  vi.mocked(s.list).mockImplementation(async()=>[{...recipe,stars:starred?[{user_id:'a'}]:[]}]);
+  vi.mocked(s.setStar).mockImplementation(async(_id,_owner,value)=>{starred=value;});
+  const user=userEvent.setup(); show(s);
+  const button=await screen.findByRole('button',{name:'Star Gnocchi'}); await user.click(button);
+  expect(button).toHaveAttribute('aria-pressed','true'); expect(s.get).not.toHaveBeenCalled(); expect(s.setStar).toHaveBeenCalledWith(recipe.id,'a',true);
+  await user.click(screen.getByRole('link',{name:'Starred'})); expect(await screen.findByRole('link',{name:/Gnocchi/})).toBeVisible();
+  await user.click(screen.getByRole('button',{name:'Star Gnocchi'})); expect(await screen.findByText('Your favorites will feel at home here.')).toBeVisible(); expect(s.remove).not.toHaveBeenCalled();
+});
+it('retains star state and recipe content after failure and permits retry', async () => {
+  const s=service(); vi.mocked(s.setStar).mockRejectedValueOnce(new Error('offline')); const user=userEvent.setup(); show(s,`/cookbook/${recipe.id}`);
+  const button=await screen.findByRole('button',{name:'Star Gnocchi'}); await user.click(button);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t update this star'); expect(button).toHaveAttribute('aria-pressed','false'); expect(screen.getByText('Pan fry.')).toBeVisible();
+  await user.click(button); expect(button).toHaveAttribute('aria-pressed','true'); expect(screen.queryByRole('alert')).toBeNull();
+});
+it('prevents duplicate star requests while saving', async () => {
+  const s=service(); let finish!:()=>void; vi.mocked(s.setStar).mockImplementation(()=>new Promise<void>(r=>{finish=r;})); const user=userEvent.setup(); show(s);
+  const button=await screen.findByRole('button',{name:'Star Gnocchi'}); await user.click(button); expect(button).toBeDisabled(); await user.click(button); expect(s.setStar).toHaveBeenCalledTimes(1); await act(async()=>finish()); expect(button).toHaveAttribute('aria-pressed','true');
+});
+it('hides unstarred recipes from the Starred view', async () => {
+  const s=service(); show(s,'/cookbook/starred'); expect(await screen.findByText('Your favorites will feel at home here.')).toBeVisible(); expect(screen.queryByRole('link',{name:/Gnocchi/})).toBeNull();
 });

@@ -30,6 +30,7 @@ These client settings are public; database row-level security protects records. 
    - `supabase/migrations/20261021000100_core_recipe_model.sql`
    - `supabase/migrations/20261021000200_auth_profiles.sql`
    - `supabase/migrations/20261027000100_recipe_management.sql`
+   - `supabase/migrations/20261027000200_recipe_stars.sql`
 3. Under Authentication URL Configuration, set the local Site URL to `http://localhost:5173` and add both `http://localhost:5173/auth/callback` and `http://127.0.0.1:5173/auth/callback` to allowed redirects. Add the exact production HTTPS callback when a domain is available.
 4. Keep the signup confirmation template using Supabase's `{{ .ConfirmationURL }}` link. The app passes its current origin plus `/auth/callback` when signing up. The browser client uses Supabase's implicit flow to process the returned session; the app then routes to `/cookbook` and removes tokens from the URL. Invalid/expired links show recovery guidance without displaying raw URL errors.
 5. For external testers, configure and verify email delivery/SMTP. Default provider email restrictions and limits can prevent delivery; never claim the confirmation flow is live until a real email has been received and followed.
@@ -41,7 +42,7 @@ No migration has been applied to a hosted project as part of this implementation
 ## Tests and build
 
 ```sh
-pnpm test           # 9 database tests and 28 UI tests
+pnpm test           # 12 database tests and 32 UI tests
 pnpm build          # TypeScript checks and production bundle
 pnpm exec playwright install chromium
 pnpm test:browser   # 4 browser flows; local server started automatically
@@ -61,6 +62,14 @@ Errors appear after leaving a field or submitting the form, and update as you co
 Save opens the full recipe. Edit loads its existing values; a failed save keeps the form intact. Delete asks for confirmation with the recipe name. **Keep recipe** makes no changes; confirming removes the recipe and ingredients and returns to the collection.
 
 Creation and editing call `save_recipe` once through Supabase RPC. PostgreSQL saves the recipe and its ordered ingredients in one transaction. Any failure rolls back all changes. Ownership comes from the signed-in identity; row-level security protects both reads and writes. The new migration must be installed before using recipe saving. See `schema.md` for transaction and concurrency details.
+
+## Starred recipes
+
+Use the Star button on a recipe card or detail page to keep a favorite handy. The button shows its saved state and is disabled while saving. Stars are separate from the 1–5 rating. Select **Starred** above the collection to view favorites, or **All recipes** to return. Unstarring removes a recipe from Starred but keeps the recipe itself. A failed request leaves the displayed state unchanged and allows retry.
+
+Apply the stars migration before running this app version: recipe queries include star records. Stars persist in Supabase across refresh, navigation, and recipe edits. Only the owner can star their own recipes; account and recipe deletion remove associated stars. The Starred view filters the current user's paginated collection locally; server-side search/filtering is a later feature.
+
+Local checks include star uniqueness, owner-only access, anonymous restrictions, cascades, failed requests, duplicate-submission protection, and Starred empty states. Before release, verify persistence after signing out/in and cross-user restrictions against real Supabase; local tests simulate identity and HTTP responses.
 
 ## Development-project checks before release
 
