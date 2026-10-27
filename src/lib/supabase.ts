@@ -1,3 +1,4 @@
+import { createRecipeService } from '../recipes/service';
 import { createClient } from '@supabase/supabase-js';
 import type { AuthService } from '../auth/service';
 
@@ -30,3 +31,5 @@ export const authService: AuthService | null = client ? {
   signUp: (email, password, redirectTo) => client.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } }),
   signOut: () => client.auth.signOut({ scope: 'local' }),
 } : null;
+
+export const recipeService = client ? createRecipeService(client) : null;

@@ -1,6 +1,6 @@
 # EasyRecipesCookbook database
 
-This feature defines the first three tables in PLAN.md. The SQL sources are `supabase/migrations/20261021000100_core_recipe_model.sql` and `supabase/migrations/20261021000200_auth_profiles.sql`.
+The database implements the first three tables in PLAN.md. The SQL sources are `supabase/migrations/20261021000100_core_recipe_model.sql` `supabase/migrations/20261021000200_auth_profiles.sql`, and `supabase/migrations/20261027000100_recipe_management.sql`.
 
 ## Relationships
 
@@ -8,7 +8,7 @@ This feature defines the first three tables in PLAN.md. The SQL sources are `sup
 erDiagram
     AUTH_USERS ||--|| USERS : has_profile
     USERS ||--o{ RECIPES : owns
-    RECIPES ||--o{ INGREDIENTS : contains
+    RECIPES ||--|{ INGREDIENTS : contains
 ```
 
 Supabase manages `auth.users`, including authentication credentials. `public.users` holds app profiles. Here, `public` is a database schema name: profiles are private under row-level security.
@@ -64,7 +64,17 @@ Deleting a recipe deletes its ingredients. Deleting an auth account deletes its 
 
 ## Feature boundaries
 
-The schema permits a recipe to exist while its ingredients are being added. The recipe CRUD feature must save a recipe and at least one ingredient atomically; do not expose an incomplete save flow. That cross-table requirement is not enforced by this migration. Implement the future save with a database function called through one RPC: validate a nonempty ingredient array, insert the recipe and ingredient rows within the same transaction, and roll back the entire operation on any error. Use the caller's identity and ownership policies; do not use separate browser requests for each row.
+### Atomic recipe saves
+
+`public.save_recipe(p_recipe jsonb, p_ingredients jsonb, p_id uuid default null)` returns the saved recipe UUID. Omit `p_id` for creation; supply an owned recipe ID for editing. Recipe JSON contains title, instructions, servings, minutes, store, source_url, and rating. Ingredient JSON is a nonempty array of name, quantity, and unit objects; array order becomes position. Missing quantities become null; missing/blank units default to item. The form requires an explicit unit and initially fills item.
+
+The function derives ownership exclusively from `auth.uid()`, uses SECURITY INVOKER with an empty search_path, and is executable only by authenticated users. Existing RLS and column grants still apply. Unknown and inaccessible recipe IDs both raise “Recipe not found.” It replaces ingredients within the same transaction as the recipe update; validation failures roll back everything, including title and timestamp changes. Ingredient IDs are regenerated on edit. It never accepts ownership changes.
+
+Deferred constraint triggers require at least one ingredient when a recipe insert/update or ingredient removal/move commits. This permits temporary empty ingredients inside the save transaction but rejects incomplete direct writes. Existing empty recipes from before this migration are not automatically changed; they must gain an ingredient when edited. Deleting a recipe or account still cascades normally.
+
+Recipe updates serialize concurrent RPC edits. A BEFORE DELETE/UPDATE ingredient trigger also writes the old parent recipe, serializing direct removals and preventing write skew at repeatable-read isolation. This refreshes the parent’s updated_at timestamp for direct ingredient changes. Conflicting transactions may need retry after a deadlock/serialization error. The local single-connection tests verify constraints and rollback, not concurrent server behavior; validate that separately on development PostgreSQL.
+
+No table columns or ownership policies change in this migration.
 
 Stars, cooking_notes, meal_plan_entries, and grocery_items remain planned. Their migrations will arrive with their features. The original PLAN.md is unchanged.
 

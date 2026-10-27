@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
+import { RecipePages } from './recipes/RecipePages';
+import type { RecipeService } from './recipes/model';
 import { friendlyError } from './auth/service';
 
 function BookMark() {
@@ -82,7 +84,7 @@ function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
     </>}
   </section></div>;
 }
-function Cookbook() {
+function Cookbook({ recipeService }: { recipeService: RecipeService | null }) {
   const { session, service, clearSession } = useAuth();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -97,7 +99,7 @@ function Cookbook() {
     } catch { setError(friendlyError(null, 'logout')); }
     finally { setBusy(false); }
   }
-  return <section className="cookbook"><div className="account-bar"><p>Signed in as <strong>{session.user.email}</strong></p><button className="secondary" onClick={logout} disabled={busy}>{busy ? 'Logging out…' : 'Log out'}</button></div>{error && <p className="error" role="alert">{error}</p>}<div className="empty-state"><p className="eyebrow">A FRESH PAGE</p><h1>Your cookbook<br/>starts <em>here.</em></h1><Illustration /><h2>Make room for your favorites.</h2><p>This is your personal space for easy dinners and little improvements.<br/>Recipe saving is coming next.</p></div></section>;
+  return <section className="cookbook"><div className="account-bar"><p>Signed in as <strong>{session.user.email}</strong></p><button className="secondary" onClick={logout} disabled={busy}>{busy ? 'Logging out…' : 'Log out'}</button></div>{error && <p className="error" role="alert">{error}</p>}<RecipePages service={recipeService} owner={session.user.id}/></section>;
 }
 function Confirmation({ failed }: { failed: boolean }) {
   const { session } = useAuth();
@@ -105,14 +107,14 @@ function Confirmation({ failed }: { failed: boolean }) {
   if (!failed && session) return <Navigate to="/cookbook" replace />;
   return <section className="message-card"><h1>{failed ? 'That link didn’t work' : 'Ready to log in?'}</h1><p>{failed ? 'Your confirmation link may have expired or already been used. Try logging in if you confirmed your email, or sign up again to request a new confirmation.' : 'If you’ve confirmed your email, log in to open your cookbook.'}</p><Link className="primary button-link" to="/login">Go to login</Link><Link to="/signup">Back to signup</Link></section>;
 }
-export function App({ confirmationFailed = false }: { confirmationFailed?: boolean }) {
+export function App({ confirmationFailed = false, recipeService = null }: { confirmationFailed?: boolean; recipeService?: RecipeService | null }) {
   const { loading, failed, retry, session } = useAuth();
   return <Frame>{loading ? <p role="status" className="loading">Opening your cookbook…</p> : failed ? <section className="message-card"><h1>Let’s try that again</h1><p role="alert">We couldn’t restore your session. Check your connection and retry.</p><button className="primary" onClick={retry}>Try again</button></section> : <Routes>
     <Route path="/" element={<Navigate to={session ? '/cookbook' : '/login'} replace />} />
     <Route path="/login" element={<AuthForm key="login" mode="login" />} />
     <Route path="/signup" element={<AuthForm key="signup" mode="signup" />} />
     <Route path="/auth/callback" element={<Confirmation failed={confirmationFailed} />} />
-    <Route path="/cookbook" element={<Cookbook key={session?.user.id ?? 'signed-out'} />} />
+    <Route path="/cookbook/*" element={<Cookbook recipeService={recipeService} key={session?.user.id ?? 'signed-out'} />} />
     <Route path="*" element={<section className="message-card"><h1>A page out of place</h1><Link to="/">Back to your cookbook</Link></section>} />
   </Routes>}</Frame>;
 }
