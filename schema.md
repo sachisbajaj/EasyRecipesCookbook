@@ -1,6 +1,6 @@
 # EasyRecipesCookbook database
 
-The database implements the first three tables in PLAN.md. The SQL sources are `supabase/migrations/20261021000100_core_recipe_model.sql` `supabase/migrations/20261021000200_auth_profiles.sql`, and `supabase/migrations/20261027000100_recipe_management.sql`.
+The database implements users, recipes, ingredients, and stars from PLAN.md. The SQL sources are `supabase/migrations/20261021000100_core_recipe_model.sql` `supabase/migrations/20261021000200_auth_profiles.sql`, and `supabase/migrations/20261027000100_recipe_management.sql`, and `supabase/migrations/20261027000200_recipe_stars.sql`.
 
 ## Relationships
 
@@ -9,6 +9,8 @@ erDiagram
     AUTH_USERS ||--|| USERS : has_profile
     USERS ||--o{ RECIPES : owns
     RECIPES ||--|{ INGREDIENTS : contains
+    USERS ||--o{ STARS : saves
+    RECIPES ||--o{ STARS : receives
 ```
 
 Supabase manages `auth.users`, including authentication credentials. `public.users` holds app profiles. Here, `public` is a database schema name: profiles are private under row-level security.
@@ -56,9 +58,19 @@ Owners can create, read, edit, and delete recipes. They cannot change ownership,
 
 Access depends on ownership of the parent recipe. Both the old and new parent must be owned by the caller when changing recipe_id. An index on (recipe_id, position) supports ingredient lookup and ordering. Positions need not be unique; the UI can use id as a stable tie-breaker.
 
+## stars
+
+| Column | PostgreSQL type | Rules |
+| --- | --- | --- |
+| user_id | uuid | References users.id; account/profile deletion cascades |
+| recipe_id | uuid | References recipes.id; recipe deletion cascades |
+| created_at | timestamptz | Required; defaults to current time |
+
+The composite primary key (user_id, recipe_id) prevents duplicate stars and supports user lookups. A separate recipe_id index supports recipe deletion. Users may read, insert, and delete only their own stars for recipes they own. Anonymous clients have no table access. Clients cannot update either key or created_at; star/unstar is insert/delete. The client inserts with ON CONFLICT DO NOTHING for idempotent star requests. Unstarring is an owner-scoped delete. Recipe edits retain stars because the parent recipe ID is unchanged. Stars do not change the numeric recipe rating.
+
 ## Security and deletion
 
-All three tables enable row-level security. Anonymous clients have no table access. Authenticated users see only their own rows, even when another user's ID is known. Explicit column grants prevent clients from changing recipe ownership or managed timestamps. Service-role operations are privileged and must remain server-side.
+All four tables enable row-level security. Anonymous clients have no table access. Authenticated users see only their own rows, even when another user's ID is known. Explicit column grants prevent clients from changing recipe ownership or managed timestamps. Service-role operations are privileged and must remain server-side.
 
 Deleting a recipe deletes its ingredients. Deleting an auth account deletes its profile, recipes, and ingredients. Future tables will add their deletion rules in their own migrations.
 
@@ -76,7 +88,7 @@ Recipe updates serialize concurrent RPC edits. A BEFORE DELETE/UPDATE ingredient
 
 No table columns or ownership policies change in this migration.
 
-Stars, cooking_notes, meal_plan_entries, and grocery_items remain planned. Their migrations will arrive with their features. The original PLAN.md is unchanged.
+Cooking_notes, meal_plan_entries, and grocery_items remain planned. Their migrations will arrive with their features. The original PLAN.md is unchanged.
 
 ## Verification
 

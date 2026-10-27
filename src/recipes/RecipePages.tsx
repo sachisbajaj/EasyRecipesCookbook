@@ -12,16 +12,35 @@ function useLoad<T>(fetcher: () => Promise<T>, dependencies: unknown[]) {
     fetcher().then(value => { if (active) setData(value); }).catch(() => { if (active) setError(true); });
     return () => { active = false; };
   }, [...dependencies, attempt]);
-  return { data, error, retry: () => setAttempt(n => n + 1) };
+  return { data, setData, error, retry: () => setAttempt(n => n + 1) };
 }
 function LoadError({ retry }: { retry: () => void }) { return <div role="alert"><p>We couldn’t load your recipes. Please try again.</p><button className="secondary" onClick={retry}>Try again</button></div>; }
 function Missing() { return <section><h1>Recipe not found</h1><p>This recipe isn’t available in your cookbook.</p><Link to="/cookbook">Back to cookbook</Link></section>; }
-function Collection({ service, owner }: Props) {
-  const { data, error, retry } = useLoad(() => service.list(owner), [service, owner]);
+function StarButton({ recipe, service, owner, onChange }: Props & { recipe: Recipe; onChange?: (starred: boolean) => void }) {
+  const [starred, setStarred] = useState(Boolean(recipe.stars?.some(star => star.user_id === owner)));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const locked = useRef(false); const active = useRef(true);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
+  async function toggle() {
+    if (locked.current) return;
+    const next = !starred; locked.current = true; setBusy(true); setError('');
+    try {
+      await service.setStar(recipe.id, owner, next);
+      if (active.current) { setStarred(next); onChange?.(next); }
+    } catch { if (active.current) setError('Couldn’t update this star. Please try again.'); }
+    finally { locked.current = false; if (active.current) setBusy(false); }
+  }
+  return <div className="star-control"><button type="button" className="secondary" aria-label={`Star ${recipe.title}`} aria-pressed={starred} disabled={busy} onClick={toggle}><span aria-hidden="true">{starred ? '★' : '☆'}</span> {busy ? 'Saving…' : starred ? 'Starred' : 'Star'}</button>{error && <p className="field-error" role="alert">{error}</p>}</div>;
+}
+function Collection({ service, owner, starredOnly = false }: Props & { starredOnly?: boolean }) {
+  const { data, setData, error, retry } = useLoad(() => service.list(owner), [service, owner]);
   const location = useLocation();
-  return <section><div className="recipe-heading"><div><p className="eyebrow">GOOD FOOD, ON REPEAT</p><h1>Your weeknight favorites</h1></div><Link className="primary button-link" to="/cookbook/new">Add recipe</Link></div>
+  const visible = data?.filter(recipe => !starredOnly || recipe.stars?.some(star => star.user_id === owner));
+  return <section><div className="recipe-heading"><div><p className="eyebrow">GOOD FOOD, ON REPEAT</p><h1>{starredOnly ? 'Your starred recipes' : 'Your weeknight favorites'}</h1></div><Link className="primary button-link" to="/cookbook/new">Add recipe</Link></div>
+    <nav className="recipe-tabs" aria-label="Recipe views"><Link to="/cookbook" aria-current={!starredOnly ? 'page' : undefined}>All recipes</Link><Link to="/cookbook/starred" aria-current={starredOnly ? 'page' : undefined}>Starred</Link></nav>
     {location.state?.message && <p role="status">{location.state.message}</p>}
-    {error ? <LoadError retry={retry}/> : !data ? <p role="status">Opening your recipes…</p> : data.length === 0 ? <div className="empty-state"><h2>Your next favorite starts here.</h2><p>Save an easy dinner, its ingredients, and the link you want to come back to.</p><Link to="/cookbook/new">Add your first recipe →</Link></div> : <div className="recipe-grid">{data.map(recipe => <Link className="recipe-card" key={recipe.id} to={`/cookbook/${recipe.id}`}><p className="eyebrow">{recipe.store || 'FROM YOUR KITCHEN'}</p><h2>{recipe.title}</h2><p>{recipe.servings} servings{recipe.minutes !== null && ` · ${recipe.minutes} min`}</p><p>{recipe.rating === null ? 'Not rated yet' : `${recipe.rating} / 5`}</p><span>Let’s cook →</span></Link>)}</div>}
+    {error ? <LoadError retry={retry}/> : !visible ? <p role="status">Opening your recipes…</p> : visible.length === 0 ? <div className="empty-state"><h2>{starredOnly ? 'Your favorites will feel at home here.' : 'Your next favorite starts here.'}</h2><p>{starredOnly ? 'Star a recipe you want to make again. It will appear here.' : 'Save an easy dinner, its ingredients, and the link you want to come back to.'}</p><Link to={starredOnly ? '/cookbook' : '/cookbook/new'}>{starredOnly ? 'Browse all recipes →' : 'Add your first recipe →'}</Link></div> : <div className="recipe-grid">{visible.map(recipe => <article className="recipe-card" key={recipe.id}><Link className="recipe-card-link" to={`/cookbook/${recipe.id}`}><p className="eyebrow">{recipe.store || 'FROM YOUR KITCHEN'}</p><h2>{recipe.title}</h2><p>{recipe.servings} servings{recipe.minutes !== null && ` · ${recipe.minutes} min`}</p><p>{recipe.rating === null ? 'Not rated yet' : `${recipe.rating} / 5`}</p><span>Let’s cook →</span></Link><StarButton recipe={recipe} service={service} owner={owner} onChange={starred => setData(previous => previous?.map(item => item.id === recipe.id ? { ...item, stars: starred ? [{ user_id: owner }] : [] } : item))}/></article>)}</div>}
   </section>;
 }
 function Editor({ service, recipe }: { service: RecipeService; recipe?: Recipe }) {
@@ -84,7 +103,7 @@ function Detail({ recipe, service, owner }: Props & { recipe: Recipe }) {
   }
   const source = safeSource(recipe.source_url);
   return <article className="recipe-detail"><Link to="/cookbook">← Your cookbook</Link><p className="eyebrow">{recipe.store || 'FROM YOUR KITCHEN'}</p><h1>{recipe.title}</h1><p className="recipe-meta">{recipe.servings} servings{recipe.minutes !== null && ` · ${recipe.minutes} min`} · {recipe.rating === null ? 'Not rated yet' : `${recipe.rating} / 5`}</p>
-    <div className="recipe-actions"><Link className="secondary button-link" to={`/cookbook/${recipe.id}/edit`}>Edit recipe</Link><button className="secondary" onClick={() => { setError(''); dialog.current?.showModal(); cancel.current?.focus(); }}>Delete recipe</button>{source && <a href={source} target="_blank" rel="noopener noreferrer">View original recipe ↗</a>}</div>
+    <div className="recipe-actions"><StarButton recipe={recipe} service={service} owner={owner}/><Link className="secondary button-link" to={`/cookbook/${recipe.id}/edit`}>Edit recipe</Link><button className="secondary" onClick={() => { setError(''); dialog.current?.showModal(); cancel.current?.focus(); }}>Delete recipe</button>{source && <a href={source} target="_blank" rel="noopener noreferrer">View original recipe ↗</a>}</div>
     <div className="recipe-body"><section><h2>Ingredients</h2><ul className="ingredient-list">{[...recipe.ingredients].sort((a,b) => a.position-b.position).map(i => <li key={i.id}><strong>{i.name}</strong><span>{i.quantity === null ? 'As needed' : `${formatAmount(i.quantity)} ${i.unit}`}</span></li>)}</ul></section><section><h2>Let’s make it</h2><p className="instructions">{recipe.instructions}</p></section></div>
     <dialog ref={dialog} aria-labelledby="delete-title" aria-describedby="delete-description" onCancel={e => { if (lock.current) e.preventDefault(); }}><h2 id="delete-title">Delete “{recipe.title}”?</h2><p id="delete-description">This removes the recipe and its ingredients from your cookbook.</p>{error && <p role="alert" className="error">{error}</p>}<div className="recipe-actions"><button ref={cancel} className="secondary" disabled={busy} onClick={() => dialog.current?.close()}>Keep recipe</button><button className="primary" disabled={busy} onClick={remove}>{busy ? 'Deleting…' : 'Yes, delete recipe'}</button></div></dialog>
   </article>;
@@ -100,5 +119,5 @@ function Existing({ service, owner, edit = false }: Props & { edit?: boolean }) 
 export function RecipePages({ service, owner }: { service: RecipeService | null; owner: string }) {
   const location = useLocation();
   if (!service) return <p role="status">Recipe access isn’t available yet. Please try again later.</p>;
-  return <Routes key={location.pathname}><Route index element={<Collection service={service} owner={owner}/>}/><Route path="new" element={<Editor service={service}/>}/><Route path=":id" element={<Existing service={service} owner={owner}/>}/><Route path=":id/edit" element={<Existing service={service} owner={owner} edit/>}/><Route path="*" element={<Missing/>}/></Routes>;
+  return <Routes key={location.pathname}><Route index element={<Collection service={service} owner={owner}/>}/><Route path="starred" element={<Collection service={service} owner={owner} starredOnly/>}/><Route path="new" element={<Editor service={service}/>}/><Route path=":id" element={<Existing service={service} owner={owner}/>}/><Route path=":id/edit" element={<Existing service={service} owner={owner} edit/>}/><Route path="*" element={<Missing/>}/></Routes>;
 }

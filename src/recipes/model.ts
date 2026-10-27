@@ -1,5 +1,6 @@
 export type Ingredient = { id: string; recipe_id: string; name: string; quantity: number | null; unit: string; position: number };
 export type Recipe = {
+  stars?: { user_id: string }[];
   id: string; user_id: string; title: string; instructions: string; servings: number;
   minutes: number | null; store: string | null; source_url: string | null; rating: number | null;
   created_at: string; updated_at: string; ingredients: Ingredient[];
@@ -11,6 +12,7 @@ export interface RecipeService {
   get(id: string, owner: string): Promise<Recipe | null>;
   save(recipe: RecipeValues, ingredients: IngredientValues[], id: string | null): Promise<string>;
   remove(id: string, owner: string): Promise<void>;
+  setStar(id: string, owner: string, starred: boolean): Promise<void>;
 }
 export class RecipeMissing extends Error {}
 export const isRecipeId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
