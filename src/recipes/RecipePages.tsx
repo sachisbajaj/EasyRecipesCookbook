@@ -1,5 +1,6 @@
+import { readControls, selectRecipes, storeOptions } from './collection';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { blankIngredient, formatAmount, RecipeMissing, safeSource, toDraft, toValues, validateDraft, type Recipe, type RecipeDraft, type RecipeService } from './model';
 
 type Props = { service: RecipeService; owner: string };
@@ -36,11 +37,33 @@ function StarButton({ recipe, service, owner, onChange }: Props & { recipe: Reci
 function Collection({ service, owner, starredOnly = false }: Props & { starredOnly?: boolean }) {
   const { data, setData, error, retry } = useLoad(() => service.list(owner), [service, owner]);
   const location = useLocation();
-  const visible = data?.filter(recipe => !starredOnly || recipe.stars?.some(star => star.user_id === owner));
+  const [params, setParams] = useSearchParams();
+  const controls = readControls(params);
+  const owned = data?.filter(recipe => recipe.user_id === owner);
+  const inView = owned?.filter(recipe => !starredOnly || recipe.stars?.some(star => star.user_id === owner));
+  const visible = data ? selectRecipes(data, { ...controls, owner, starredOnly }) : undefined;
+  const stores = storeOptions(owned ?? []);
+  function changeControl(key: string, value: string) {
+    setParams(previous => {
+      const next = new URLSearchParams(previous);
+      if (!value || (key === 'sort' && value === 'newest')) next.delete(key); else next.set(key, value);
+      return next;
+    }, { replace: key === 'q' });
+  }
+  function resetControls() {
+    setParams(previous => { const next = new URLSearchParams(previous); ['q','store','sort'].forEach(key => next.delete(key)); return next; });
+  }
   return <section><div className="recipe-heading"><div><p className="eyebrow">GOOD FOOD, ON REPEAT</p><h1>{starredOnly ? 'Your starred recipes' : 'Your weeknight favorites'}</h1></div><Link className="primary button-link" to="/cookbook/new">Add recipe</Link></div>
-    <nav className="recipe-tabs" aria-label="Recipe views"><Link to="/cookbook" aria-current={!starredOnly ? 'page' : undefined}>All recipes</Link><Link to="/cookbook/starred" aria-current={starredOnly ? 'page' : undefined}>Starred</Link></nav>
+    <nav className="recipe-tabs" aria-label="Recipe views"><Link to={`/cookbook${location.search}`} aria-current={!starredOnly ? 'page' : undefined}>All recipes</Link><Link to={`/cookbook/starred${location.search}`} aria-current={starredOnly ? 'page' : undefined}>Starred</Link></nav>
+    <div className="collection-controls">
+      <div><label htmlFor="recipe-search">Search titles</label><input id="recipe-search" type="search" placeholder="Find a weeknight favorite" value={controls.query} onChange={event => changeControl('q', event.target.value)}/></div>
+      <div><label htmlFor="store-filter">Store or source</label><select id="store-filter" value={controls.store} onChange={event => changeControl('store', event.target.value)}><option value="">All stores</option><option value="none">No store/source</option>{stores.map(store => <option key={store.value} value={store.value}>{store.label}</option>)}{controls.store.startsWith('store:') && !stores.some(store => store.value === controls.store) && <option value={controls.store}>Selected store (unavailable)</option>}</select></div>
+      <div><label htmlFor="recipe-sort">Sort recipes</label><select id="recipe-sort" value={controls.sort} onChange={event => changeControl('sort', event.target.value)}><option value="newest">Newest</option><option value="rating">Highest rating</option><option value="time">Shortest cooking time</option></select></div>
+      <button type="button" className="secondary" onClick={resetControls} disabled={!controls.query && !controls.store && controls.sort === 'newest'}>Reset controls</button>
+    </div>
+    {!error && visible && <p role="status">{visible.length} {visible.length === 1 ? 'recipe' : 'recipes'} shown</p>}
     {location.state?.message && <p role="status">{location.state.message}</p>}
-    {error ? <LoadError retry={retry}/> : !visible ? <p role="status">Opening your recipes…</p> : visible.length === 0 ? <div className="empty-state"><h2>{starredOnly ? 'Your favorites will feel at home here.' : 'Your next favorite starts here.'}</h2><p>{starredOnly ? 'Star a recipe you want to make again. It will appear here.' : 'Save an easy dinner, its ingredients, and the link you want to come back to.'}</p><Link to={starredOnly ? '/cookbook' : '/cookbook/new'}>{starredOnly ? 'Browse all recipes →' : 'Add your first recipe →'}</Link></div> : <div className="recipe-grid">{visible.map(recipe => <article className="recipe-card" key={recipe.id}><Link className="recipe-card-link" to={`/cookbook/${recipe.id}`}><p className="eyebrow">{recipe.store || 'FROM YOUR KITCHEN'}</p><h2>{recipe.title}</h2><p>{recipe.servings} servings{recipe.minutes !== null && ` · ${recipe.minutes} min`}</p><p>{recipe.rating === null ? 'Not rated yet' : `${recipe.rating} / 5`}</p><span>Let’s cook →</span></Link><StarButton recipe={recipe} service={service} owner={owner} onChange={starred => setData(previous => previous?.map(item => item.id === recipe.id ? { ...item, stars: starred ? [{ user_id: owner }] : [] } : item))}/></article>)}</div>}
+    {error ? <LoadError retry={retry}/> : !visible ? <p role="status">Opening your recipes…</p> : visible.length === 0 && (inView?.length ?? 0) > 0 ? <div className="empty-state"><h2>No recipes match these controls.</h2><p>Try another title or store, or reset to see all recipes in this view.</p><button className="secondary" onClick={resetControls}>Clear search and filters</button></div> : visible.length === 0 ? <div className="empty-state"><h2>{starredOnly ? 'Your favorites will feel at home here.' : 'Your next favorite starts here.'}</h2><p>{starredOnly ? 'Star a recipe you want to make again. It will appear here.' : 'Save an easy dinner, its ingredients, and the link you want to come back to.'}</p><Link to={starredOnly ? '/cookbook' : '/cookbook/new'}>{starredOnly ? 'Browse all recipes →' : 'Add your first recipe →'}</Link></div> : <div className="recipe-grid">{visible.map(recipe => <article className="recipe-card" key={recipe.id}><Link className="recipe-card-link" to={`/cookbook/${recipe.id}`}><p className="eyebrow">{recipe.store || 'FROM YOUR KITCHEN'}</p><h2>{recipe.title}</h2><p>{recipe.servings} servings{recipe.minutes !== null && ` · ${recipe.minutes} min`}</p><p>{recipe.rating === null ? 'Not rated yet' : `${recipe.rating} / 5`}</p><span>Let’s cook →</span></Link><StarButton recipe={recipe} service={service} owner={owner} onChange={starred => setData(previous => previous?.map(item => item.id === recipe.id ? { ...item, stars: starred ? [{ user_id: owner }] : [] } : item))}/></article>)}</div>}
   </section>;
 }
 function Editor({ service, recipe }: { service: RecipeService; recipe?: Recipe }) {
