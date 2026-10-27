@@ -41,7 +41,7 @@ No migration has been applied to a hosted project as part of this implementation
 ## Tests and build
 
 ```sh
-pnpm test           # 9 database tests and 23 UI tests
+pnpm test           # 9 database tests and 28 UI tests
 pnpm build          # TypeScript checks and production bundle
 pnpm exec playwright install chromium
 pnpm test:browser   # 4 browser flows; local server started automatically
@@ -55,6 +55,8 @@ pnpm test:browser   # 4 browser flows; local server started automatically
 ## Recipe workflow
 
 After login, choose **Add recipe**. Enter a name, instructions, positive whole-number servings, and at least one ingredient with a name and unit. An amount is optional (“as needed”); any entered amount must be positive. Amounts accept decimals, fractions such as 1/4, mixed numbers such as 1 1/2, and an optional unit suffix such as 1/4 cup or 2tbsp. A unit entered with the amount takes precedence over the separate Unit field. Invalid amounts remain visible and prevent saving. Cooking time, store/source label, HTTP(S) source link, and a 1–5 rating are optional. Leaving the rating blank saves null, not zero.
+
+Errors appear after leaving a field or submitting the form, and update as you correct the value. Invalid submission focuses the first affected field; inline messages are associated with their controls for screen readers. Ingredient errors stay with their rows when other rows are removed. Malformed optional cooking time stays visible and must be corrected or explicitly cleared.
 
 Save opens the full recipe. Edit loads its existing values; a failed save keeps the form intact. Delete asks for confirmation with the recipe name. **Keep recipe** makes no changes; confirming removes the recipe and ingredients and returns to the collection.
 
