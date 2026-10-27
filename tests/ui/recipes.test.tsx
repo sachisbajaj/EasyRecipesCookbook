@@ -129,3 +129,15 @@ it('prevents duplicate star requests while saving', async () => {
 it('hides unstarred recipes from the Starred view', async () => {
   const s=service(); show(s,'/cookbook/starred'); expect(await screen.findByText('Your favorites will feel at home here.')).toBeVisible(); expect(screen.queryByRole('link',{name:/Gnocchi/})).toBeNull();
 });
+it('combines collection controls, shows no-results, and resets to the complete collection',async()=>{
+ const s=service();vi.mocked(s.list).mockResolvedValue([{...recipe,store:'Trader Joe’s',rating:4},{...recipe,id:'two',title:'Soup',store:'Other',rating:null}]);const user=userEvent.setup();show(s);
+ await screen.findByRole('link',{name:/Gnocchi/});await user.type(screen.getByLabelText('Search titles'),'soup');
+ expect(screen.queryByRole('link',{name:/Gnocchi/})).toBeNull();expect(screen.getByRole('link',{name:/Soup/})).toBeVisible();
+ await user.selectOptions(screen.getByLabelText('Store or source'),'store:trader joe’s');expect(screen.getByText('No recipes match these controls.')).toBeVisible();
+ await user.click(screen.getByRole('button',{name:'Clear search and filters'}));expect(screen.getByLabelText('Search titles')).toHaveValue('');expect(screen.getByRole('link',{name:/Gnocchi/})).toBeVisible();expect(screen.getByText('2 recipes shown')).toBeVisible();
+});
+it('restores URL controls and keeps them when opening Starred',async()=>{
+ const s=service();vi.mocked(s.list).mockResolvedValue([{...recipe,stars:[{user_id:'a'}]}]);const user=userEvent.setup();show(s,'/cookbook?q=gnocchi&sort=rating');
+ await screen.findByRole('link',{name:/Gnocchi/});expect(screen.getByLabelText('Search titles')).toHaveValue('gnocchi');expect(screen.getByLabelText('Sort recipes')).toHaveValue('rating');
+ await user.click(screen.getByRole('link',{name:'Starred'}));expect(await screen.findByRole('link',{name:/Gnocchi/})).toBeVisible();expect(screen.getByLabelText('Search titles')).toHaveValue('gnocchi');
+});

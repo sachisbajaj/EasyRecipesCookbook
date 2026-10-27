@@ -42,7 +42,7 @@ No migration has been applied to a hosted project as part of this implementation
 ## Tests and build
 
 ```sh
-pnpm test           # 12 database tests and 32 UI tests
+pnpm test           # 12 database tests and 39 UI tests
 pnpm build          # TypeScript checks and production bundle
 pnpm exec playwright install chromium
 pnpm test:browser   # 4 browser flows; local server started automatically
@@ -67,9 +67,19 @@ Creation and editing call `save_recipe` once through Supabase RPC. PostgreSQL sa
 
 Use the Star button on a recipe card or detail page to keep a favorite handy. The button shows its saved state and is disabled while saving. Stars are separate from the 1–5 rating. Select **Starred** above the collection to view favorites, or **All recipes** to return. Unstarring removes a recipe from Starred but keeps the recipe itself. A failed request leaves the displayed state unchanged and allows retry.
 
-Apply the stars migration before running this app version: recipe queries include star records. Stars persist in Supabase across refresh, navigation, and recipe edits. Only the owner can star their own recipes; account and recipe deletion remove associated stars. The Starred view filters the current user's paginated collection locally; server-side search/filtering is a later feature.
+Apply the stars migration before running this app version: recipe queries include star records. Stars persist in Supabase across refresh, navigation, and recipe edits. Only the owner can star their own recipes; account and recipe deletion remove associated stars. The Starred view and collection controls operate on the current user's complete paginated collection.
 
 Local checks include star uniqueness, owner-only access, anonymous restrictions, cascades, failed requests, duplicate-submission protection, and Starred empty states. Before release, verify persistence after signing out/in and cross-user restrictions against real Supabase; local tests simulate identity and HTTP responses.
+
+## Find a recipe
+
+Search titles using case-insensitive literal text; spaces around the query are ignored. The store/source filter groups labels by trimmed, case-insensitive spelling. **All stores** includes every recipe; **No store/source** selects only recipes with no label. These options remain distinct from recipes whose actual store label has the same name.
+
+Combine search and store filtering with **Newest**, **Highest rating**, or **Shortest cooking time**. Unrated recipes and recipes with no cooking time sort last for their respective sort. Ties use newest creation time, then recipe ID. Stars and numeric ratings remain independent.
+
+Controls work in both All recipes and Starred, show a result count, and provide a reset action. A filtered list with no matches has a separate message from an empty cookbook. Controls are reflected in URL query parameters and restored on refresh or Back/Forward. Typing replaces the current history entry; selecting a filter or sort adds a history entry. Switching recipe views keeps the controls. Search text is visible in the URL; no credentials are included.
+
+The app loads all owner-scoped recipe pages before filtering and sorting locally. This avoids first-page-only results, but transfers the full cookbook and is intended for an initial personal collection. Large collections would benefit from server-side filtering and pagination in a later change. Existing row-level security remains the authorization boundary. No schema changes are required for these controls.
 
 ## Development-project checks before release
 
