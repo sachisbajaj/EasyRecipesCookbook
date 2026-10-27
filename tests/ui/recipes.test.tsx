@@ -67,3 +67,42 @@ it('preserves typed fractions, saves numeric quantities, and rejects malformed a
   await user.clear(amount); await user.type(amount,'1/4 cup'); await user.click(screen.getByRole('button',{name:'Save recipe'}));
   expect(s.save).toHaveBeenCalledWith(expect.anything(),[{name:'Gnocchi',quantity:0.25,unit:'cup'}],recipe.id);
 });
+it('waits for blur, links errors to fields, and clears them during correction', async () => {
+  const user=userEvent.setup(); show(service(),'/cookbook/new');
+  const title=screen.getByLabelText('Recipe name'); expect(screen.queryByRole('alert')).toBeNull();
+  await user.click(title); expect(title).toHaveAttribute('aria-invalid','false'); await user.tab();
+  expect(title).toHaveAccessibleDescription('Give your recipe a name.');
+  await user.type(title,'Pasta'); expect(title).toHaveAttribute('aria-invalid','false'); expect(title).not.toHaveAttribute('aria-describedby');
+  expect(screen.getByLabelText('Servings')).toHaveAttribute('aria-invalid','false');
+});
+it('focuses the first invalid input and associates ingredient errors with stable rows', async () => {
+  const user=userEvent.setup(); show(service(),'/cookbook/new');
+  await user.click(screen.getByRole('button',{name:'Save recipe'})); expect(screen.getByLabelText('Recipe name')).toHaveFocus();
+  await user.type(screen.getByLabelText('Recipe name'),'Pasta'); await user.type(screen.getByLabelText('Instructions'),'Cook.');
+  await user.type(screen.getByLabelText('Ingredient 1'),'Pasta'); await user.click(screen.getByRole('button',{name:'Add ingredient'}));
+  await user.type(screen.getByLabelText('Ingredient 2'),'Salt'); await user.type(screen.getByLabelText('Amount 2'),'1/0');
+  const bad=screen.getByLabelText('Amount 2'); await user.click(screen.getByRole('button',{name:'Save recipe'})); expect(bad).toHaveFocus(); expect(bad).toHaveAccessibleDescription(/Enter an amount/);
+  await user.click(screen.getByRole('button',{name:'Remove ingredient 1'})); expect(screen.getByLabelText('Amount 1')).toBe(bad); expect(bad).toHaveAccessibleDescription(/Enter an amount/);
+  await user.click(screen.getByRole('button',{name:'Remove ingredient 1'})); expect(screen.queryByText(/Enter an amount such/)).toBeNull();
+  await user.click(screen.getByRole('button',{name:'Save recipe'})); expect(screen.getByRole('button',{name:'Add ingredient'})).toHaveFocus();
+});
+it('retains malformed optional cooking time until corrected rather than saving it as blank', async () => {
+  const s=service(); const user=userEvent.setup(); show(s,`/cookbook/${recipe.id}/edit`);
+  const minutes=await screen.findByLabelText('Cooking time in minutes (optional)'); await user.type(minutes,'1e');
+  await user.click(screen.getByRole('button',{name:'Save recipe'})); expect(minutes).toHaveValue('1e'); expect(minutes).toHaveFocus(); expect(minutes).toHaveAccessibleDescription(/positive whole number/); expect(s.save).not.toHaveBeenCalled();
+  await user.clear(minutes); expect(minutes).toHaveAttribute('aria-invalid','false'); await user.click(screen.getByRole('button',{name:'Save recipe'})); expect(s.save).toHaveBeenCalledWith(expect.objectContaining({minutes:null}),expect.anything(),recipe.id);
+});
+it('preserves every ingredient after a failed create and allows retry after correction', async () => {
+  const s=service(); vi.mocked(s.save).mockRejectedValueOnce(new Error('private SQL details')); const user=userEvent.setup(); show(s,'/cookbook/new');
+  await user.type(screen.getByLabelText('Recipe name'),'Dip'); await user.type(screen.getByLabelText('Instructions'),'Blend.'); await user.type(screen.getByLabelText('Ingredient 1'),'Yogurt'); await user.type(screen.getByLabelText('Amount 1'),'1/4 cup');
+  await user.click(screen.getByRole('button',{name:'Add ingredient'})); await user.type(screen.getByLabelText('Ingredient 2'),'Sauce'); await user.type(screen.getByLabelText('Amount 2'),'2tbsp');
+  await user.click(screen.getByRole('button',{name:'Save recipe'})); expect(await screen.findByRole('alert')).toHaveTextContent('Check your connection'); expect(screen.queryByText('private SQL details')).toBeNull();
+  expect(screen.getByLabelText('Amount 1')).toHaveValue('1/4 cup'); expect(screen.getByLabelText('Amount 2')).toHaveValue('2tbsp');
+  await user.click(screen.getByRole('button',{name:'Save recipe'})); expect(s.save).toHaveBeenCalledTimes(2); expect(s.save).toHaveBeenLastCalledWith(expect.objectContaining({rating:null}),[{name:'Yogurt',quantity:0.25,unit:'cup'},{name:'Sauce',quantity:2,unit:'tbsp'}],null);
+});
+it('rejects invalid optional values and nonfinite amounts without converting them to empty values', () => {
+  const draft=toDraft(recipe);
+  for(const value of ['0','-1','1.5','NaN','Infinity','2147483648']) expect(validateDraft({...draft,minutes:value}).minutes).toBeTruthy();
+  for(const value of ['NaN','Infinity','-Infinity','1/0','0/4','1/','-1/4']) expect(validateDraft({...draft,ingredients:[{...draft.ingredients[0],quantity:value}]})).toHaveProperty('i-quantity');
+  for(const value of ['ftp://example.com','javascript:alert(1)','https://','https://a b.com']) expect(validateDraft({...draft,source_url:value}).source_url).toBeTruthy();
+});
