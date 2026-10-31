@@ -1,3 +1,4 @@
+import type { PlannerService } from '../planner/model';
 import type { NotesService } from '../notes/model';
 export type Ingredient = { id: string; recipe_id: string; name: string; quantity: number | null; unit: string; position: number };
 export type Recipe = {
@@ -9,6 +10,7 @@ export type Recipe = {
 export type RecipeValues = Pick<Recipe, 'title' | 'instructions' | 'servings' | 'minutes' | 'store' | 'source_url' | 'rating'>;
 export type IngredientValues = Pick<Ingredient, 'name' | 'quantity' | 'unit'>;
 export interface RecipeService {
+  planner: PlannerService;
   notes: NotesService;
   list(owner: string): Promise<Recipe[]>;
   get(id: string, owner: string): Promise<Recipe | null>;

@@ -21,3 +21,23 @@
 .note-editor textarea { width: 100%; font: inherit; padding: 14px; border: 1px solid #c9bcaa; border-radius: 8px; background: #fffdf8; color: inherit; resize: vertical; }
 .note-editor textarea:focus-visible { outline: 3px solid #45644a; outline-offset: 4px; }
 .note-editor textarea[aria-invalid=true] { border-color: #a9432e; }
+
+.meal-plan { margin: 42px 0; }
+.meal-plan h1 { font-size: clamp(32px,4vw,52px); }
+.week-controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; margin: 24px 0 12px; }
+.week-controls label { margin-top: 0; }
+.meal-editor { padding: 24px; margin: 24px 0 32px; border: 1px solid #d9cbb9; border-radius: 16px; background: #fffdf7; }
+.meal-editor fieldset { min-width: 0; border: 0; padding: 0; }
+.meal-editor legend { font-size: 1.3rem; font-weight: 700; }
+.meal-fields { display: grid; grid-template-columns: 2fr 1.3fr 1fr; gap: 20px; }
+.meal-fields > div { min-width: 0; }
+.meal-editor select { width: 100%; min-height: 48px; font: inherit; padding: 10px; border: 1px solid #d4c8b8; border-radius: 7px; color: inherit; background: #fffdf9; }
+.meal-editor select:focus-visible { outline: 3px solid #45644a; outline-offset: 4px; }
+.meal-editor select[aria-invalid=true] { border-color: #a9432e; }
+.week-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap: 20px; }
+.meal-day { border: 1px solid #dfd3c2; border-radius: 16px; padding: 22px; min-width: 0; }
+.meal-day h2 { font-size: 24px; }
+.meal-day ul { padding: 0; list-style: none; }
+.meal-day li { padding-top: 16px; border-top: 1px solid #dfd3c2; overflow-wrap: anywhere; }
+.meal-day .recipe-actions { margin: 12px 0 20px; gap: 8px; }
+@media(max-width:650px) { .meal-fields,.week-grid { grid-template-columns: 1fr; } .meal-editor { padding: 18px; } .week-controls { align-items: stretch; } }

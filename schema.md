@@ -70,9 +70,9 @@ The composite primary key (user_id, recipe_id) prevents duplicate stars and supp
 
 ## Security and deletion
 
-All five tables enable row-level security. Anonymous clients have no table access. Authenticated users see only their own rows, even when another user's ID is known. Explicit column grants prevent clients from changing recipe ownership or managed timestamps. Service-role operations are privileged and must remain server-side.
+All six tables enable row-level security. Anonymous clients have no table access. Authenticated users see only their own rows, even when another user's ID is known. Explicit column grants prevent clients from changing recipe ownership or managed timestamps. Service-role operations are privileged and must remain server-side.
 
-Deleting a recipe deletes its ingredients, stars, and cooking notes. Deleting an auth account deletes its profile, recipes, ingredients, stars, and cooking notes. Future tables will add their deletion rules in their own migrations.
+Deleting a recipe deletes its ingredients, stars, cooking notes, and planned meals. Deleting an auth account deletes its profile, recipes, ingredients, stars, cooking notes, and planned meals. Future tables will add their deletion rules in their own migrations.
 
 ## Feature boundaries
 
@@ -88,7 +88,7 @@ Recipe updates serialize concurrent RPC edits. A BEFORE DELETE/UPDATE ingredient
 
 No table columns or ownership policies change in this migration.
 
-Meal_plan_entries and grocery_items remain planned. Their migrations will arrive with their features. The original PLAN.md is unchanged.
+Grocery_items remains planned. Their migrations will arrive with their features. The original PLAN.md is unchanged.
 
 ## Verification
 
@@ -112,3 +112,19 @@ Introduced by `20261030000100_cooking_notes.sql`.
 The index `(recipe_id, cooked_on DESC, created_at DESC, id DESC)` supports recipe history in deterministic newest-first order. RLS checks ownership of the parent recipe for reads, inserts, updates, and deletes. Anonymous users have no grants. Authenticated users may insert only recipe_id and the three editable fields; updates may change only cooked_on, what_worked, and next_time. This prevents reparenting even to another owned recipe. Service-role access remains privileged.
 
 Each note save is a single insert or update. It never updates the recipe rating or replaces other history. Recipe edits preserve notes through the stable recipe ID. Recipe and account deletion cascade to history.
+
+## meal_plan_entries
+
+Introduced by `20261031000100_meal_planning.sql`.
+
+| Column | PostgreSQL type | Rules |
+| --- | --- | --- |
+| id | uuid | Generated primary key; immutable to clients |
+| user_id | uuid | Required FK to users.id; deletion cascades; immutable to clients |
+| recipe_id | uuid | Required FK to recipes.id; deletion cascades |
+| planned_date | date | Required finite calendar date in years 0001–9999 |
+| servings | integer | Required; greater than zero |
+
+An index on `(user_id, planned_date, id)` supports weekly owner reads; a recipe_id index supports recipe cascades. No uniqueness rule limits meals per day or repetitions. Each entry's servings are independent of the recipe's base servings.
+
+RLS permits only the entry owner to read, insert, edit, or delete, and verifies that the referenced recipe also belongs to that owner on both existing and new rows. Column grants prevent client changes to id or user_id. Users may switch to another recipe they own. Anonymous access is denied. Deleting a recipe or an auth account cascades to associated planned meals. No grocery snapshot is generated or modified by planner operations.
