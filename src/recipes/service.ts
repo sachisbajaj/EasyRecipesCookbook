@@ -1,3 +1,4 @@
+import { createGroceryService } from '../groceries/service';
 import { createPlannerService } from '../planner/service';
 import { createNotesService } from '../notes/service';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -5,6 +6,7 @@ import { isRecipeId, RecipeMissing, type Recipe, type RecipeService } from './mo
 export function createRecipeService(client: SupabaseClient): RecipeService {
   return {
     notes: createNotesService(client),
+    groceries: createGroceryService(client),
     planner: createPlannerService(client),
     async list(owner) {
       const recipes: Recipe[] = [];

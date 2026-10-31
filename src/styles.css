@@ -41,3 +41,13 @@
 .meal-day li { padding-top: 16px; border-top: 1px solid #dfd3c2; overflow-wrap: anywhere; }
 .meal-day .recipe-actions { margin: 12px 0 20px; gap: 8px; }
 @media(max-width:650px) { .meal-fields,.week-grid { grid-template-columns: 1fr; } .meal-editor { padding: 18px; } .week-controls { align-items: stretch; } }
+
+.grocery-list { list-style: none; padding: 0; }
+.grocery-list > li { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; gap: 20px; padding: 20px 0; border-bottom: 1px solid #dfd3c2; }
+.grocery-check { display: flex; gap: 14px; align-items: center; margin: 0; font-size: 17px; cursor: pointer; overflow-wrap: anywhere; }
+.grocery-check input { width: 22px; height: 22px; flex: 0 0 22px; accent-color: #45644a; }
+.grocery-checked .grocery-check span { text-decoration: line-through; color: #6c6156; }
+.grocery-amount { color: #6c6156; overflow-wrap: anywhere; }
+.grocery-list .recipe-actions { margin: 0; gap: 8px; }
+.cookbook-nav { flex-wrap: wrap; }
+@media(max-width:650px) { .grocery-list > li { grid-template-columns: minmax(0,1fr) auto; gap: 12px; } .grocery-list .recipe-actions { grid-column: 1/-1; } }

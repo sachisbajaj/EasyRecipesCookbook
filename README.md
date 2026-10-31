@@ -33,6 +33,7 @@ These client settings are public; database row-level security protects records. 
    - `supabase/migrations/20261027000200_recipe_stars.sql`
    - `supabase/migrations/20261030000100_cooking_notes.sql`
    - `supabase/migrations/20261031000100_meal_planning.sql`
+   - `supabase/migrations/20261031000200_grocery_lists.sql`
 3. Under Authentication URL Configuration, set the local Site URL to `http://localhost:5173` and add both `http://localhost:5173/auth/callback` and `http://127.0.0.1:5173/auth/callback` to allowed redirects. Add the exact production HTTPS callback when a domain is available.
 4. Keep the signup confirmation template using Supabase's `{{ .ConfirmationURL }}` link. The app passes its current origin plus `/auth/callback` when signing up. The browser client uses Supabase's implicit flow to process the returned session; the app then routes to `/cookbook` and removes tokens from the URL. Invalid/expired links show recovery guidance without displaying raw URL errors.
 5. For external testers, configure and verify email delivery/SMTP. Default provider email restrictions and limits can prevent delivery; never claim the confirmation flow is live until a real email has been received and followed.
@@ -44,10 +45,10 @@ No migration has been applied to a hosted project as part of this implementation
 ## Tests and build
 
 ```sh
-pnpm test           # 18 database tests and 55 UI tests
+pnpm test           # 22 database tests and 60 UI tests
 pnpm build          # TypeScript checks and production bundle
 pnpm exec playwright install chromium
-pnpm test:browser   # 7 browser flows; local server started automatically
+pnpm test:browser   # 8 browser flows; local server started automatically
 ```
 
 - Database tests use PGlite with simulated Supabase identity objects. They cover data isolation, validation, cascades, automatic profiles, backfill behavior, atomic recipe saves, failed-save rollback, guessed recipe IDs, and the minimum-ingredient rule.
@@ -127,3 +128,15 @@ Choose **Meal Plan** in the cookbook navigation. Select any date to open its Mon
 Edit a planned meal's recipe, date, or servings; cancel to discard edits. Removing a meal asks for confirmation and keeps the recipe. Deleting a recipe also removes its planned meals. Failed requests preserve form entries or the existing meal. Changing weeks starts a fresh form for the new week.
 
 Apply `20261031000100_meal_planning.sql` after earlier migrations before using the planner. Tests cover database isolation and validation, foreign recipe rejection, cascades, calendar boundaries, failed requests, and a browser add/edit/remove flow with repeated meals, refresh, URL navigation, and mobile layout. Local tests simulate identity and HTTP; verify persistence and access with two real development Supabase accounts before release. No hosted migration is applied by these tests.
+
+## Weekly grocery lists
+
+Open **Grocery List** and choose a week. **Generate from meals** creates a saved checklist from that week's planned recipes, using each ingredient's quantity × planned servings ÷ base recipe servings. Repeated meals contribute each time. Names and units are trimmed, whitespace is collapsed, and case is ignored when combining ingredients. Different names or units remain separate; there is no unit conversion or product inference. If a matching ingredient has both known and unknown amounts, its measured total and a separate “as needed” entry are both retained.
+
+Add extra items manually, edit names/amounts/units, remove items after confirmation, and check off bought or already-owned items. Amounts accept the same fractions and optional unit suffixes as recipe ingredients. A blank amount means “as needed.” Saved edits and checkmarks persist by account and week.
+
+The list is a snapshot. Recipe edits/deletion and meal-plan changes never silently update it. Generation always asks for confirmation because it replaces all items, edits, manual additions, checkmarks, and unsaved form edits for that week. Generating with no planned meals produces an empty list. Other weeks and accounts are unaffected. If generation succeeds but the refresh fails, use **Reload saved list**; it reads the saved result without generating again.
+
+Apply `20261031000200_grocery_lists.sql` after the meal-planning migration in a development database. Generation runs in one database transaction, and concurrent generations for the same account/week are serialized. A failed replacement rolls back the prior list. Concurrent manual edits from another browser follow normal database transaction ordering; there is no collaborative editing or conflict-resolution UI.
+
+Tests cover scaling, repeated meals, unit/product separation, mixed known/unknown amounts, whitespace/case normalization, private access, validation, immutable ownership/week, rollback, snapshot independence and account cascades. UI/browser tests cover confirmation, failed requests, edits, checkmarks, refresh, week changes and mobile layout. PGlite simulates identity and a single database connection; browser tests mock HTTP. These checks do not verify hosted PostgREST, real login, or multi-connection concurrency. Verify those separately against a development Supabase project before release.

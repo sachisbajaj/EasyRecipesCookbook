@@ -70,9 +70,9 @@ The composite primary key (user_id, recipe_id) prevents duplicate stars and supp
 
 ## Security and deletion
 
-All six tables enable row-level security. Anonymous clients have no table access. Authenticated users see only their own rows, even when another user's ID is known. Explicit column grants prevent clients from changing recipe ownership or managed timestamps. Service-role operations are privileged and must remain server-side.
+All seven tables enable row-level security. Anonymous clients have no table access. Authenticated users see only their own rows, even when another user's ID is known. Explicit column grants prevent clients from changing recipe ownership or managed timestamps. Service-role operations are privileged and must remain server-side.
 
-Deleting a recipe deletes its ingredients, stars, cooking notes, and planned meals. Deleting an auth account deletes its profile, recipes, ingredients, stars, cooking notes, and planned meals. Future tables will add their deletion rules in their own migrations.
+Deleting a recipe deletes its ingredients, stars, cooking notes, and planned meals. Deleting an auth account deletes its profile, recipes, ingredients, stars, cooking notes, planned meals, and grocery items.
 
 ## Feature boundaries
 
@@ -88,7 +88,7 @@ Recipe updates serialize concurrent RPC edits. A BEFORE DELETE/UPDATE ingredient
 
 No table columns or ownership policies change in this migration.
 
-Grocery_items remains planned. Their migrations will arrive with their features. The original PLAN.md is unchanged.
+All planned tables now have versioned migrations. The original PLAN.md is unchanged.
 
 ## Verification
 
@@ -128,3 +128,24 @@ Introduced by `20261031000100_meal_planning.sql`.
 An index on `(user_id, planned_date, id)` supports weekly owner reads; a recipe_id index supports recipe cascades. No uniqueness rule limits meals per day or repetitions. Each entry's servings are independent of the recipe's base servings.
 
 RLS permits only the entry owner to read, insert, edit, or delete, and verifies that the referenced recipe also belongs to that owner on both existing and new rows. Column grants prevent client changes to id or user_id. Users may switch to another recipe they own. Anonymous access is denied. Deleting a recipe or an auth account cascades to associated planned meals. No grocery snapshot is generated or modified by planner operations.
+
+## grocery_items
+
+Introduced by `20261031000200_grocery_lists.sql`.
+
+| Column | PostgreSQL type | Rules |
+| --- | --- | --- |
+| id | uuid | Generated PK; immutable to clients |
+| user_id | uuid | Required FK to users.id; account deletion cascades; immutable |
+| week_start | date | Required Monday in a complete supported week; immutable |
+| name | text | Required non-whitespace content |
+| quantity | numeric | Optional finite positive value; null means “as needed” |
+| unit | text | Required non-whitespace content |
+| checked | boolean | Required; defaults false |
+| position | integer | Required nonnegative integer; defaults zero |
+
+The `(user_id, week_start, position, id)` index supports ordered per-week lists. All entries for an owner/week constitute that week's single checklist. No recipe foreign key exists: snapshots remain after recipe changes/deletion. Account deletion removes lists. RLS restricts every operation to the owner, and column grants forbid client changes to id, user_id, or week_start. Anonymous access is denied. Owners may edit item content, checkmarks and position or delete rows.
+
+`generate_grocery_list(p_week date)` is a SECURITY INVOKER function with an empty search_path. It derives ownership from auth.uid(), validates a Monday week, acquires a transaction advisory lock for that owner/week, deletes that week's rows, and inserts scaled/aggregated owned meal ingredients in the same transaction. Exceptions roll back the entire replacement. Execution is granted only to authenticated clients; RLS remains active. Two generations for the same owner/week cannot interleave their delete/insert operations; separate users/weeks remain independent.
+
+The amount is ingredient quantity × meal servings ÷ recipe servings, calculated with PostgreSQL numeric arithmetic. Grouping keys are lowercase, whitespace-collapsed, trimmed name and unit, plus whether quantity is unknown. Known quantities sum; unknown amounts retain a separate null row. Display names preserve a representative normalized spelling; unit labels use the normalized unit. Different units/products never merge. Generated positions follow normalized name/unit order, and all generated checkmarks start false. Manual items default to position zero; ID breaks ties. Empty generations leave no rows; the UI treats an empty generated list and a not-yet-generated list identically.
