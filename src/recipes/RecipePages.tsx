@@ -1,7 +1,9 @@
 import { readControls, selectRecipes, storeOptions } from './collection';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { blankIngredient, formatAmount, RecipeMissing, safeSource, toDraft, toValues, validateDraft, type Recipe, type RecipeDraft, type RecipeService } from './model';
+
+const Dashboard = lazy(() => import('../dashboard/Dashboard'));
 
 type Props = { service: RecipeService; owner: string };
 function useLoad<T>(fetcher: () => Promise<T>, dependencies: unknown[]) {
@@ -142,5 +144,5 @@ function Existing({ service, owner, edit = false }: Props & { edit?: boolean }) 
 export function RecipePages({ service, owner }: { service: RecipeService | null; owner: string }) {
   const location = useLocation();
   if (!service) return <p role="status">Recipe access isn’t available yet. Please try again later.</p>;
-  return <Routes key={location.pathname}><Route index element={<Collection service={service} owner={owner}/>}/><Route path="starred" element={<Collection service={service} owner={owner} starredOnly/>}/><Route path="new" element={<Editor service={service}/>}/><Route path=":id" element={<Existing service={service} owner={owner}/>}/><Route path=":id/edit" element={<Existing service={service} owner={owner} edit/>}/><Route path="*" element={<Missing/>}/></Routes>;
+  return <><nav className="cookbook-nav" aria-label="Cookbook navigation"><Link to="/cookbook" aria-current={location.pathname !== '/cookbook/dashboard' ? 'page' : undefined}>Recipes</Link><Link to="/cookbook/dashboard" aria-current={location.pathname === '/cookbook/dashboard' ? 'page' : undefined}>Dashboard</Link></nav><Suspense fallback={<p role="status">Opening your dashboard…</p>}><Routes key={location.pathname}><Route path="dashboard" element={<Dashboard key={owner} service={service} owner={owner}/>}/><Route index element={<Collection service={service} owner={owner}/>}/><Route path="starred" element={<Collection service={service} owner={owner} starredOnly/>}/><Route path="new" element={<Editor service={service}/>}/><Route path=":id" element={<Existing service={service} owner={owner}/>}/><Route path=":id/edit" element={<Existing service={service} owner={owner} edit/>}/><Route path="*" element={<Missing/>}/></Routes></Suspense></>;
 }
