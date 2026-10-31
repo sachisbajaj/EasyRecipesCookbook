@@ -70,9 +70,9 @@ The composite primary key (user_id, recipe_id) prevents duplicate stars and supp
 
 ## Security and deletion
 
-All four tables enable row-level security. Anonymous clients have no table access. Authenticated users see only their own rows, even when another user's ID is known. Explicit column grants prevent clients from changing recipe ownership or managed timestamps. Service-role operations are privileged and must remain server-side.
+All five tables enable row-level security. Anonymous clients have no table access. Authenticated users see only their own rows, even when another user's ID is known. Explicit column grants prevent clients from changing recipe ownership or managed timestamps. Service-role operations are privileged and must remain server-side.
 
-Deleting a recipe deletes its ingredients. Deleting an auth account deletes its profile, recipes, and ingredients. Future tables will add their deletion rules in their own migrations.
+Deleting a recipe deletes its ingredients, stars, and cooking notes. Deleting an auth account deletes its profile, recipes, ingredients, stars, and cooking notes. Future tables will add their deletion rules in their own migrations.
 
 ## Feature boundaries
 
@@ -88,10 +88,27 @@ Recipe updates serialize concurrent RPC edits. A BEFORE DELETE/UPDATE ingredient
 
 No table columns or ownership policies change in this migration.
 
-Cooking_notes, meal_plan_entries, and grocery_items remain planned. Their migrations will arrive with their features. The original PLAN.md is unchanged.
+Meal_plan_entries and grocery_items remain planned. Their migrations will arrive with their features. The original PLAN.md is unchanged.
 
 ## Verification
 
 Run `pnpm install --frozen-lockfile` and `pnpm test`. Tests apply the migration to an isolated PGlite database, create two identities, and exercise SQL as the authenticated/anonymous roles. Coverage includes private reads/writes, guessed IDs, forbidden parent changes, validation, timestamps, and cascading deletion.
 
 The test-only auth schema and auth.uid() stand-in simulate identity supplied by Supabase. They do not test token verification, confirmation email, real signup, or the hosted API. The authentication feature includes additional simulated UI and browser tests; the real development-project checks remain pending until Supabase is configured. See README.md for the checklist.
+
+## cooking_notes
+
+Introduced by `20261030000100_cooking_notes.sql`.
+
+| Column | PostgreSQL type | Rules |
+| --- | --- | --- |
+| id | uuid | Primary key; generated automatically; immutable to clients |
+| recipe_id | uuid | Required FK to recipes.id; cascade deletion; immutable to clients |
+| cooked_on | date | Required finite calendar date in years 0001–9999 |
+| what_worked | text | Optional; at least one of the two text fields must contain non-whitespace content |
+| next_time | text | Optional; same content constraint |
+| created_at | timestamptz | Required; defaults to now(); immutable to clients |
+
+The index `(recipe_id, cooked_on DESC, created_at DESC, id DESC)` supports recipe history in deterministic newest-first order. RLS checks ownership of the parent recipe for reads, inserts, updates, and deletes. Anonymous users have no grants. Authenticated users may insert only recipe_id and the three editable fields; updates may change only cooked_on, what_worked, and next_time. This prevents reparenting even to another owned recipe. Service-role access remains privileged.
+
+Each note save is a single insert or update. It never updates the recipe rating or replaces other history. Recipe edits preserve notes through the stable recipe ID. Recipe and account deletion cascade to history.

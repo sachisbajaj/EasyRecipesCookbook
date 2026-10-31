@@ -15,7 +15,7 @@ beforeAll(()=>vi.stubGlobal('ResizeObserver',class { observe(){} unobserve(){} d
 afterAll(()=>vi.unstubAllGlobals());
 const recipe=(id:string,rating:number|null,owner='a'):Recipe=>({id,user_id:owner,title:id,instructions:'Cook',servings:2,minutes:null,store:null,source_url:null,rating,created_at:'',updated_at:'',ingredients:[],stars:[]});
 const sample=[{...recipe('one',5),stars:[{user_id:'a'}]},recipe('two',3),recipe('three',null),{...recipe('other',1,'b'),stars:[{user_id:'b'}]}];
-function service(list=sample):RecipeService{return{list:vi.fn(async()=>list),get:vi.fn(async()=>null),save:vi.fn(async()=>''),remove:vi.fn(async()=>{}),setStar:vi.fn(async()=>{})};}
+function service(list=sample):RecipeService{return{notes: { list: async()=>[], save: async()=>{throw new Error('unused')}, remove: async()=>{} },list:vi.fn(async()=>list),get:vi.fn(async()=>null),save:vi.fn(async()=>''),remove:vi.fn(async()=>{}),setStar:vi.fn(async()=>{})};}
 function show(s:RecipeService){return render(<MemoryRouter><Dashboard service={s} owner="a"/></MemoryRouter>);}
 it('shows the PLAN example: three owned recipes, 4.0 average, one star, and every chart bucket',async()=>{
  const s=service();show(s);expect(await screen.findByTestId('total-recipes')).toHaveTextContent('3');expect(screen.getByTestId('average-rating')).toHaveTextContent('4.0');expect(screen.getByTestId('starred-count')).toHaveTextContent('1');

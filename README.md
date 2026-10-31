@@ -31,6 +31,7 @@ These client settings are public; database row-level security protects records. 
    - `supabase/migrations/20261021000200_auth_profiles.sql`
    - `supabase/migrations/20261027000100_recipe_management.sql`
    - `supabase/migrations/20261027000200_recipe_stars.sql`
+   - `supabase/migrations/20261030000100_cooking_notes.sql`
 3. Under Authentication URL Configuration, set the local Site URL to `http://localhost:5173` and add both `http://localhost:5173/auth/callback` and `http://127.0.0.1:5173/auth/callback` to allowed redirects. Add the exact production HTTPS callback when a domain is available.
 4. Keep the signup confirmation template using Supabase's `{{ .ConfirmationURL }}` link. The app passes its current origin plus `/auth/callback` when signing up. The browser client uses Supabase's implicit flow to process the returned session; the app then routes to `/cookbook` and removes tokens from the URL. Invalid/expired links show recovery guidance without displaying raw URL errors.
 5. For external testers, configure and verify email delivery/SMTP. Default provider email restrictions and limits can prevent delivery; never claim the confirmation flow is live until a real email has been received and followed.
@@ -42,10 +43,10 @@ No migration has been applied to a hosted project as part of this implementation
 ## Tests and build
 
 ```sh
-pnpm test           # 12 database tests and 46 UI tests
+pnpm test           # 15 database tests and 51 UI tests
 pnpm build          # TypeScript checks and production bundle
 pnpm exec playwright install chromium
-pnpm test:browser   # 5 browser flows; local server started automatically
+pnpm test:browser   # 6 browser flows; local server started automatically
 ```
 
 - Database tests use PGlite with simulated Supabase identity objects. They cover data isolation, validation, cascades, automatic profiles, backfill behavior, atomic recipe saves, failed-save rollback, guessed recipe IDs, and the minimum-ingredient rule.
@@ -59,7 +60,7 @@ After login, choose **Add recipe**. Enter a name, instructions, positive whole-n
 
 Errors appear after leaving a field or submitting the form, and update as you correct the value. Invalid submission focuses the first affected field; inline messages are associated with their controls for screen readers. Ingredient errors stay with their rows when other rows are removed. Malformed optional cooking time stays visible and must be corrected or explicitly cleared.
 
-Save opens the full recipe. Edit loads its existing values; a failed save keeps the form intact. Delete asks for confirmation with the recipe name. **Keep recipe** makes no changes; confirming removes the recipe and ingredients and returns to the collection.
+Save opens the full recipe. Edit loads its existing values; a failed save keeps the form intact. Delete asks for confirmation with the recipe name. **Keep recipe** makes no changes; confirming removes the recipe, ingredients, and cooking notes and returns to the collection.
 
 Creation and editing call `save_recipe` once through Supabase RPC. PostgreSQL saves the recipe and its ordered ingredients in one transaction. Any failure rolls back all changes. Ownership comes from the signed-in identity; row-level security protects both reads and writes. The new migration must be installed before using recipe saving. See `schema.md` for transaction and concurrency details.
 
@@ -109,3 +110,11 @@ The dashboard reuses owner-scoped paginated recipe reads and existing RLS; it ad
 Run `pnpm build` and serve `dist`. `vercel.json` supplies an SPA fallback for direct URLs, including `/auth/callback`. Set the public Supabase variables in the host before building and allow its callback URL in Supabase. Logout uses local scope to sign out the current browser, leaving other devices signed in.
 
 References: [Supabase React authentication](https://supabase.com/docs/guides/auth/quickstarts/react), [password authentication](https://supabase.com/docs/guides/auth/passwords), and [user profile triggers](https://supabase.com/docs/guides/auth/managing-user-data).
+
+## Cooking-note history
+
+Open a recipe and scroll to **Cooking notes**. Add a cooking date and at least one of **What worked** or **Next time**. Dates are calendar dates, not timestamps; the form initially uses your local date. Newest cooking dates appear first, with creation time and ID breaking ties. Edit an entry without changing its creation time, cancel an edit, or delete an entry after confirming. A failed save preserves your input; a failed deletion leaves the entry visible. Notes do not change the recipe's overall rating.
+
+Apply `20261030000100_cooking_notes.sql` after the existing migrations in a development database before using this feature. Each entry belongs to one recipe and inherits its owner's access. Clients cannot move notes to another recipe or change server-managed IDs/timestamps. Deleting a recipe or account also deletes its notes.
+
+Local checks cover note validation, owner operations, cross-user and anonymous restrictions, immutable fields, cascades, failed requests, duplicate submissions, stale responses, and desktop/mobile browser CRUD with refresh. PGlite simulates the Supabase identity layer; browser tests intercept HTTP. Before release, verify note persistence and direct API restrictions with two real development accounts. These tests do not verify live authentication or hosted PostgREST configuration.

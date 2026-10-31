@@ -17,6 +17,7 @@ test('recipe workflow, failed save, deletion cancellation, and mobile layout wit
       const data = request.postDataJSON(); saved = {...data.p_recipe,id,user_id:owner,created_at:'2026-10-26',updated_at:'2026-10-26',ingredients:data.p_ingredients.map((i: object,position: number) => ({...i,id:`i${position}`,recipe_id:id,position}))};
       return route.fulfill({headers,json:id});
     }
+    if (path.endsWith('/cooking_notes')) return route.fulfill({headers,json:[]});
     if (path.endsWith('/stars')) {
       if (failStar) { failStar=false; return route.fulfill({status:500,headers,json:{message:'Simulated failure'}}); }
       starred=request.method()!=='DELETE'; return route.fulfill({status:204,headers});
