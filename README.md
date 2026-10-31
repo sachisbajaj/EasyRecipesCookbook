@@ -42,10 +42,10 @@ No migration has been applied to a hosted project as part of this implementation
 ## Tests and build
 
 ```sh
-pnpm test           # 12 database tests and 39 UI tests
+pnpm test           # 12 database tests and 46 UI tests
 pnpm build          # TypeScript checks and production bundle
 pnpm exec playwright install chromium
-pnpm test:browser   # 4 browser flows; local server started automatically
+pnpm test:browser   # 5 browser flows; local server started automatically
 ```
 
 - Database tests use PGlite with simulated Supabase identity objects. They cover data isolation, validation, cascades, automatic profiles, backfill behavior, atomic recipe saves, failed-save rollback, guessed recipe IDs, and the minimum-ingredient rule.
@@ -80,6 +80,14 @@ Combine search and store filtering with **Newest**, **Highest rating**, or **Sho
 Controls work in both All recipes and Starred, show a result count, and provide a reset action. A filtered list with no matches has a separate message from an empty cookbook. Controls are reflected in URL query parameters and restored on refresh or Back/Forward. Typing replaces the current history entry; selecting a filter or sort adds a history entry. Switching recipe views keeps the controls. Search text is visible in the URL; no credentials are included.
 
 The app loads all owner-scoped recipe pages before filtering and sorting locally. This avoids first-page-only results, but transfers the full cookbook and is intended for an initial personal collection. Large collections would benefit from server-side filtering and pagination in a later change. Existing row-level security remains the authorization boundary. No schema changes are required for these controls.
+
+## Dashboard
+
+Open **Dashboard** in the cookbook navigation for total recipes, average rating, starred count, and a bar chart of ratings 1–5 plus Unrated. The average uses only rated recipes and displays one decimal place; an empty or all-unrated cookbook says **Not rated yet**. Stars count recipes, independently of their numeric ratings.
+
+The chart includes zero-count categories and a visible counts table, so its values do not depend on color or hover. Recharts is loaded with the dashboard route rather than on the initial recipe screen. Dashboard totals always cover the complete owned collection and ignore search/store filters. Returning after recipe or star changes reloads the data; refresh reloads it too. Loading and errors do not display placeholder zero totals, and errors offer retry.
+
+The dashboard reuses owner-scoped paginated recipe reads and existing RLS; it adds no tables or migrations. Like the collection, it loads the full cookbook, which is suitable for initial personal use but would benefit from server aggregation at larger scale. Tests cover the PLAN example (ratings 5, 3, and unrated produce total 3 and average 4.0), each rating category, empty states, failure recovery, navigation refresh, and stale responses after account switching. Browser tests use simulated Supabase responses; real hosted verification remains pending.
 
 ## Development-project checks before release
 
