@@ -23,6 +23,12 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 
 These client settings are public; database row-level security protects records. Never use a secret/service-role key in a VITE_ variable. Local env files are ignored by Git. Restart Vite after changing them. Without valid configuration the UI renders, but account submission is disabled; it does not simulate successful login.
 
+## Run and publish on Replit
+
+The Replit Run command starts Vite on `0.0.0.0` so the preview can reach it. Publishing builds the existing Vite app as a static site from `dist`; a route rewrite serves `index.html` for paths such as `/login`, `/signup`, `/auth/callback`, and `/cookbook`.
+
+Before publishing, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to Replit Secrets so they are available during the build. These are browser configuration values; never use a Supabase service-role key in the frontend. After publishing, add the published site's exact HTTPS `/auth/callback` URL to Supabase Authentication's allowed redirect URLs. Replit provides the stable published website address when you publish the app.
+
 ## Configure development Supabase
 
 1. Create or choose a development project and enable the email/password provider. Keep email confirmation enabled to exercise the complete flow. Configure a password minimum of at least 8 characters; stronger project policies are supported by server-side validation.

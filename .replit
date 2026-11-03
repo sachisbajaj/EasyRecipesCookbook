@@ -1,0 +1,15 @@
+modules = ["nodejs-24"]
+run = "pnpm dev"
+
+[deployment]
+deploymentTarget = "static"
+build = ["pnpm", "run", "build"]
+publicDir = "dist"
+
+[[deployment.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[[ports]]
+localPort = 4173
+externalPort = 80
