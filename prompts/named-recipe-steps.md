@@ -1,0 +1,3 @@
+Replace the single recipe instructions box with ordered rows for Step and Step description. Start new recipes with one row. Explain both columns using accessible info icons and concrete cooking examples. Add another row with a circled plus. Validate each row, preserve order through save and edit, and keep existing plain-text recipes readable and editable. Test the complete flow and explain whether Supabase needs a migration.
+
+Follow-up: Automatically recognize comma-separated actions in existing recipes and suggest editable step titles from the cooking verbs. Preserve ingredient lists and existing named steps.

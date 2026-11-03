@@ -78,7 +78,7 @@ it('waits for blur, links errors to fields, and clears them during correction', 
 it('focuses the first invalid input and associates ingredient errors with stable rows', async () => {
   const user=userEvent.setup(); show(service(),'/cookbook/new');
   await user.click(screen.getByRole('button',{name:'Save recipe'})); expect(screen.getByLabelText('Recipe name')).toHaveFocus();
-  await user.type(screen.getByLabelText('Recipe name'),'Pasta'); await user.type(screen.getByLabelText('Instructions'),'Cook.');
+  await user.type(screen.getByLabelText('Recipe name'),'Pasta'); await user.type(screen.getByLabelText('Step 1'),'Prepare'); await user.type(screen.getByLabelText('Step description 1'),'Cook.');
   await user.type(screen.getByLabelText('Ingredient 1'),'Pasta'); await user.click(screen.getByRole('button',{name:'Add ingredient'}));
   await user.type(screen.getByLabelText('Ingredient 2'),'Salt'); await user.type(screen.getByLabelText('Amount 2'),'1/0');
   const bad=screen.getByLabelText('Amount 2'); await user.click(screen.getByRole('button',{name:'Save recipe'})); expect(bad).toHaveFocus(); expect(bad).toHaveAccessibleDescription(/Enter an amount/);
@@ -94,7 +94,7 @@ it('retains malformed optional cooking time until corrected rather than saving i
 });
 it('preserves every ingredient after a failed create and allows retry after correction', async () => {
   const s=service(); vi.mocked(s.save).mockRejectedValueOnce(new Error('private SQL details')); const user=userEvent.setup(); show(s,'/cookbook/new');
-  await user.type(screen.getByLabelText('Recipe name'),'Dip'); await user.type(screen.getByLabelText('Instructions'),'Blend.'); await user.type(screen.getByLabelText('Ingredient 1'),'Yogurt'); await user.type(screen.getByLabelText('Amount 1'),'1/4 cup');
+  await user.type(screen.getByLabelText('Recipe name'),'Dip'); await user.type(screen.getByLabelText('Step 1'),'Prepare'); await user.type(screen.getByLabelText('Step description 1'),'Blend.'); await user.type(screen.getByLabelText('Ingredient 1'),'Yogurt'); await user.type(screen.getByLabelText('Amount 1'),'1/4 cup');
   await user.click(screen.getByRole('button',{name:'Add ingredient'})); await user.type(screen.getByLabelText('Ingredient 2'),'Sauce'); await user.type(screen.getByLabelText('Amount 2'),'2tbsp');
   await user.click(screen.getByRole('button',{name:'Save recipe'})); expect(await screen.findByRole('alert')).toHaveTextContent('Check your connection'); expect(screen.queryByText('private SQL details')).toBeNull();
   expect(screen.getByLabelText('Amount 1')).toHaveValue('1/4 cup'); expect(screen.getByLabelText('Amount 2')).toHaveValue('2tbsp');

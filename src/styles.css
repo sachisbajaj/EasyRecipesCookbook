@@ -51,3 +51,10 @@
 .grocery-list .recipe-actions { margin: 0; gap: 8px; }
 .cookbook-nav { flex-wrap: wrap; }
 @media(max-width:650px) { .grocery-list > li { grid-template-columns: minmax(0,1fr) auto; gap: 12px; } .grocery-list .recipe-actions { grid-column: 1/-1; } }
+
+.step-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr); gap:12px; margin-bottom:12px; align-items:start; }
+.step-head { font-weight:600; }
+.step-head details { display:inline; }
+.step-head summary { display:inline-block; cursor:pointer; padding:4px; color:#45644a; }
+.step-head details p { margin:4px 0; font-weight:400; }
+.step-plus { display:inline-grid; place-items:center; border:1.5px solid currentColor; border-radius:50%; width:1.2em; height:1.2em; line-height:1; }

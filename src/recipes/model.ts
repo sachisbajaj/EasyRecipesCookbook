@@ -1,3 +1,4 @@
+import { blankStep, readSteps, writeSteps } from './steps';
 import type { GroceryService } from '../groceries/model';
 import type { PlannerService } from '../planner/model';
 import type { NotesService } from '../notes/model';
@@ -54,19 +55,22 @@ export function formatAmount(quantity: number): string {
   return String(quantity);
 }
 export type FormIngredient = { key: string; name: string; quantity: string; unit: string };
-export type RecipeDraft = { title: string; instructions: string; servings: string; minutes: string; store: string; source_url: string; rating: string; ingredients: FormIngredient[] };
+export type RecipeDraft = { title: string; steps: ReturnType<typeof blankStep>[]; servings: string; minutes: string; store: string; source_url: string; rating: string; ingredients: FormIngredient[] };
 export function blankIngredient(): FormIngredient { return { key: crypto.randomUUID(), name: '', quantity: '', unit: 'item' }; }
 export function toDraft(recipe?: Recipe): RecipeDraft {
   return recipe ? {
-    title: recipe.title, instructions: recipe.instructions, servings: String(recipe.servings), minutes: recipe.minutes === null ? '' : String(recipe.minutes),
+    title: recipe.title, steps: readSteps(recipe.instructions).map(step => ({ ...step, key: crypto.randomUUID() })), servings: String(recipe.servings), minutes: recipe.minutes === null ? '' : String(recipe.minutes),
     store: recipe.store ?? '', source_url: recipe.source_url ?? '', rating: recipe.rating === null ? '' : String(recipe.rating),
     ingredients: [...recipe.ingredients].sort((a,b) => a.position-b.position).map(i => ({ key: i.id, name: i.name, quantity: i.quantity === null ? '' : formatAmount(i.quantity), unit: i.unit })),
-  } : { title: '', instructions: '', servings: '2', minutes: '', store: '', source_url: '', rating: '', ingredients: [blankIngredient()] };
+  } : { title: '', steps: [blankStep()], servings: '2', minutes: '', store: '', source_url: '', rating: '', ingredients: [blankIngredient()] };
 }
 export function validateDraft(draft: RecipeDraft): Record<string, string> {
   const errors: Record<string, string> = {};
   if (!draft.title.trim()) errors.title = 'Give your recipe a name.';
-  if (!draft.instructions.trim()) errors.instructions = 'Add the cooking instructions.';
+  for (const step of draft.steps) {
+    if (!step.name.trim()) errors[step.key + '-name'] = 'Give this step a name.';
+    if (!step.description.trim()) errors[step.key + '-description'] = 'Describe what to do in this step.';
+  }
   const positiveInteger = (v: string) => /^\d+$/.test(v.trim()) && Number(v) > 0 && Number(v) <= 2147483647;
   if (!positiveInteger(draft.servings)) errors.servings = 'Enter a positive whole number of servings.';
   if (draft.minutes.trim() && !positiveInteger(draft.minutes)) errors.minutes = 'Enter a positive whole number of minutes.';
@@ -82,7 +86,7 @@ export function validateDraft(draft: RecipeDraft): Record<string, string> {
   return errors;
 }
 export function toValues(d: RecipeDraft): { recipe: RecipeValues; ingredients: IngredientValues[] } {
-  return { recipe: { title: d.title.trim(), instructions: d.instructions.trim(), servings: Number(d.servings), minutes: d.minutes.trim() ? Number(d.minutes) : null,
+  return { recipe: { title: d.title.trim(), instructions: writeSteps(d.steps), servings: Number(d.servings), minutes: d.minutes.trim() ? Number(d.minutes) : null,
     store: d.store.trim() || null, source_url: d.source_url.trim() || null, rating: d.rating ? Number(d.rating) : null },
     ingredients: d.ingredients.map(i => ({ name: i.name.trim(), quantity: parseAmount(i.quantity).quantity, unit: parseAmount(i.quantity).unit ?? i.unit.trim() })) };
 }
