@@ -141,3 +141,18 @@ it('restores URL controls and keeps them when opening Starred',async()=>{
  await screen.findByRole('link',{name:/Gnocchi/});expect(screen.getByLabelText('Search titles')).toHaveValue('gnocchi');expect(screen.getByLabelText('Sort recipes')).toHaveValue('rating');
  await user.click(screen.getByRole('link',{name:'Starred'}));expect(await screen.findByRole('link',{name:/Gnocchi/})).toBeVisible();expect(screen.getByLabelText('Search titles')).toHaveValue('gnocchi');
 });
+
+it.each(['/cookbook', '/cookbook/starred'])('returns to %s with its search, store and sort after editing', async path => {
+  const s = service();
+  vi.mocked(s.list).mockResolvedValue([{ ...recipe, store: 'Market', stars: [{ user_id: 'a' }] }]);
+  const user = userEvent.setup();
+  show(s, path + '?q=gnocchi&store=store%3Amarket&sort=rating');
+  await user.click(await screen.findByRole('link', { name: /Gnocchi/ }));
+  await user.click(await screen.findByRole('link', { name: 'Edit recipe' }));
+  await user.click(await screen.findByRole('button', { name: 'Save recipe' }));
+  await user.click(await screen.findByRole('link', { name: /Your cookbook/ }));
+  expect(await screen.findByRole('link', { name: path.endsWith('starred') ? 'Starred' : 'All recipes' })).toHaveAttribute('aria-current', 'page');
+  expect(screen.getByLabelText('Search titles')).toHaveValue('gnocchi');
+  expect(screen.getByLabelText('Store or source')).toHaveValue('store:market');
+  expect(screen.getByLabelText('Sort recipes')).toHaveValue('rating');
+});

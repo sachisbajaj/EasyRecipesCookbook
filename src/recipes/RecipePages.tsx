@@ -45,6 +45,7 @@ function Collection({ service, owner, starredOnly = false }: Props & { starredOn
   const location = useLocation();
   const [params, setParams] = useSearchParams();
   const controls = readControls(params);
+  const listState = { cookbook: { pathname: starredOnly ? '/cookbook/starred' : '/cookbook', search: location.search } };
   const owned = data?.filter(recipe => recipe.user_id === owner);
   const inView = owned?.filter(recipe => !starredOnly || recipe.stars?.some(star => star.user_id === owner));
   const visible = data ? selectRecipes(data, { ...controls, owner, starredOnly }) : undefined;
@@ -59,7 +60,7 @@ function Collection({ service, owner, starredOnly = false }: Props & { starredOn
   function resetControls() {
     setParams(previous => { const next = new URLSearchParams(previous); ['q','store','sort'].forEach(key => next.delete(key)); return next; });
   }
-  return <section><div className="recipe-heading"><div><p className="eyebrow">GOOD FOOD, ON REPEAT</p><h1>{starredOnly ? 'Your starred recipes' : 'Your weeknight favorites'}</h1></div><Link className="primary button-link" to="/cookbook/new">Add recipe</Link></div>
+  return <section><div className="recipe-heading"><div><p className="eyebrow">GOOD FOOD, ON REPEAT</p><h1>{starredOnly ? 'Your starred recipes' : 'Your weeknight favorites'}</h1></div><Link className="primary button-link" to="/cookbook/new" state={listState}>Add recipe</Link></div>
     <nav className="recipe-tabs" aria-label="Recipe views"><Link to={`/cookbook${location.search}`} aria-current={!starredOnly ? 'page' : undefined}>All recipes</Link><Link to={`/cookbook/starred${location.search}`} aria-current={starredOnly ? 'page' : undefined}>Starred</Link></nav>
     <div className="collection-controls">
       <div><label htmlFor="recipe-search">Search titles</label><input id="recipe-search" type="search" placeholder="Find a weeknight favorite" value={controls.query} onChange={event => changeControl('q', event.target.value)}/></div>
@@ -69,10 +70,11 @@ function Collection({ service, owner, starredOnly = false }: Props & { starredOn
     </div>
     {!error && visible && <p role="status">{visible.length} {visible.length === 1 ? 'recipe' : 'recipes'} shown</p>}
     {location.state?.message && <p role="status">{location.state.message}</p>}
-    {error ? <LoadError retry={retry}/> : !visible ? <p role="status">Opening your recipes…</p> : visible.length === 0 && (inView?.length ?? 0) > 0 ? <div className="empty-state"><h2>No recipes match these controls.</h2><p>Try another title or store, or reset to see all recipes in this view.</p><button className="secondary" onClick={resetControls}>Clear search and filters</button></div> : visible.length === 0 ? <div className="empty-state"><h2>{starredOnly ? 'Your favorites will feel at home here.' : 'Your next favorite starts here.'}</h2><p>{starredOnly ? 'Star a recipe you want to make again. It will appear here.' : 'Save an easy dinner, its ingredients, and the link you want to come back to.'}</p><Link to={starredOnly ? '/cookbook' : '/cookbook/new'}>{starredOnly ? 'Browse all recipes →' : 'Add your first recipe →'}</Link></div> : <div className="recipe-grid">{visible.map(recipe => <article className="recipe-card" key={recipe.id}><Link className="recipe-card-link" to={`/cookbook/${recipe.id}`}><p className="eyebrow">{recipe.store || 'FROM YOUR KITCHEN'}</p><h2>{recipe.title}</h2><p>{recipe.servings} servings{recipe.minutes !== null && ` · ${recipe.minutes} min`}</p><p>{recipe.rating === null ? 'Not rated yet' : `${recipe.rating} / 5`}</p><span>Let’s cook →</span></Link><StarButton recipe={recipe} service={service} owner={owner} onChange={starred => setData(previous => previous?.map(item => item.id === recipe.id ? { ...item, stars: starred ? [{ user_id: owner }] : [] } : item))}/></article>)}</div>}
+    {error ? <LoadError retry={retry}/> : !visible ? <p role="status">Opening your recipes…</p> : visible.length === 0 && (inView?.length ?? 0) > 0 ? <div className="empty-state"><h2>No recipes match these controls.</h2><p>Try another title or store, or reset to see all recipes in this view.</p><button className="secondary" onClick={resetControls}>Clear search and filters</button></div> : visible.length === 0 ? <div className="empty-state"><h2>{starredOnly ? 'Your favorites will feel at home here.' : 'Your next favorite starts here.'}</h2><p>{starredOnly ? 'Star a recipe you want to make again. It will appear here.' : 'Save an easy dinner, its ingredients, and the link you want to come back to.'}</p><Link to={starredOnly ? '/cookbook' : '/cookbook/new'}>{starredOnly ? 'Browse all recipes →' : 'Add your first recipe →'}</Link></div> : <div className="recipe-grid">{visible.map(recipe => <article className="recipe-card" key={recipe.id}><Link className="recipe-card-link" state={listState} to={`/cookbook/${recipe.id}`}><p className="eyebrow">{recipe.store || 'FROM YOUR KITCHEN'}</p><h2>{recipe.title}</h2><p>{recipe.servings} servings{recipe.minutes !== null && ` · ${recipe.minutes} min`}</p><p>{recipe.rating === null ? 'Not rated yet' : `${recipe.rating} / 5`}</p><span>Let’s cook →</span></Link><StarButton recipe={recipe} service={service} owner={owner} onChange={starred => setData(previous => previous?.map(item => item.id === recipe.id ? { ...item, stars: starred ? [{ user_id: owner }] : [] } : item))}/></article>)}</div>}
   </section>;
 }
 function Editor({ service, recipe }: { service: RecipeService; recipe?: Recipe }) {
+  const { state } = useLocation();
   const [draft, setDraft] = useState<RecipeDraft>(() => toDraft(recipe));
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [attempt, setAttempt] = useState(0);
@@ -101,7 +103,7 @@ function Editor({ service, recipe }: { service: RecipeService; recipe?: Recipe }
     setAttempt(n => n + 1); setFailure('');
     if (Object.keys(invalid).length) return;
     lock.current = true; setBusy(true);
-    try { const values = toValues(draft); const id = await service.save(values.recipe, values.ingredients, recipe?.id ?? null); if (active.current) navigate(`/cookbook/${id}`, { replace: true }); }
+    try { const values = toValues(draft); const id = await service.save(values.recipe, values.ingredients, recipe?.id ?? null); if (active.current) navigate(`/cookbook/${id}`, { replace: true, state }); }
     catch (error) { if (active.current) setFailure(error instanceof RecipeMissing ? 'This recipe is no longer available. Your entries are still here; copy them before leaving this page.' : 'We couldn’t save this recipe. Your entries are still here. Check your connection and try again.'); }
     finally { lock.current = false; if (active.current) setBusy(false); }
   }
@@ -137,22 +139,24 @@ function Editor({ service, recipe }: { service: RecipeService; recipe?: Recipe }
       <label htmlFor="rating">Rating (optional)</label><select id="rating" {...errorProps('rating')} value={draft.rating} onChange={e => setDraft(d => ({ ...d, rating: e.target.value }))}><option value="">Not rated yet</option>{[1,2,3,4,5].map(n => <option key={n} value={n}>{n} / 5</option>)}</select>{errorMessage('rating')}
       {Object.keys(errors).length > 0 && <p role="alert" className="error">Please correct the marked fields, then save again.</p>}{failure && <p role="alert" className="error">{failure}</p>}
       {/* Keep blur validation from moving Save between mouse-down and click. Keyboard submission still works. */}
-      <div className="recipe-actions"><button className="primary" type="submit" onMouseDown={event => event.preventDefault()}>{busy ? 'Saving…' : 'Save recipe'}</button><button type="button" className="secondary" onClick={() => navigate(recipe ? `/cookbook/${recipe.id}` : '/cookbook')}>Cancel</button></div>
+      <div className="recipe-actions"><button className="primary" type="submit" onMouseDown={event => event.preventDefault()}>{busy ? 'Saving…' : 'Save recipe'}</button><button type="button" className="secondary" onClick={() => navigate(recipe ? `/cookbook/${recipe.id}` : state?.cookbook ?? '/cookbook', { state })}>Cancel</button></div>
     </fieldset></form></section>;
 }
 function Detail({ recipe, service, owner }: Props & { recipe: Recipe }) {
+  const { state } = useLocation();
+  const cookbook = state?.cookbook ?? '/cookbook';
   const dialog = useRef<HTMLDialogElement>(null); const cancel = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false); const lock = useRef(false); const active = useRef(true); const [error, setError] = useState(''); const navigate = useNavigate();
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   async function remove() {
     if (lock.current) return; lock.current = true; setBusy(true); setError('');
-    try { await service.remove(recipe.id, owner); if (active.current) navigate('/cookbook', { replace: true, state: { message: 'Recipe deleted.' } }); }
+    try { await service.remove(recipe.id, owner); if (active.current) navigate(cookbook, { replace: true, state: { message: 'Recipe deleted.' } }); }
     catch { if (active.current) setError('We couldn’t delete this recipe. Please try again.'); }
     finally { lock.current = false; if (active.current) setBusy(false); }
   }
   const source = safeSource(recipe.source_url);
-  return <article className="recipe-detail"><Link to="/cookbook">← Your cookbook</Link><p className="eyebrow">{recipe.store || 'FROM YOUR KITCHEN'}</p><h1>{recipe.title}</h1><p className="recipe-meta">{recipe.servings} servings{recipe.minutes !== null && ` · ${recipe.minutes} min`} · {recipe.rating === null ? 'Not rated yet' : `${recipe.rating} / 5`}</p>
-    <div className="recipe-actions"><StarButton recipe={recipe} service={service} owner={owner}/><Link className="secondary button-link" to={`/cookbook/${recipe.id}/edit`}>Edit recipe</Link><button className="secondary" onClick={() => { setError(''); dialog.current?.showModal(); cancel.current?.focus(); }}>Delete recipe</button>{source && <a href={source} target="_blank" rel="noopener noreferrer">View original recipe ↗</a>}</div>
+  return <article className="recipe-detail"><Link to={cookbook}>← Your cookbook</Link><p className="eyebrow">{recipe.store || 'FROM YOUR KITCHEN'}</p><h1>{recipe.title}</h1><p className="recipe-meta">{recipe.servings} servings{recipe.minutes !== null && ` · ${recipe.minutes} min`} · {recipe.rating === null ? 'Not rated yet' : `${recipe.rating} / 5`}</p>
+    <div className="recipe-actions"><StarButton recipe={recipe} service={service} owner={owner}/><Link className="secondary button-link" to={`/cookbook/${recipe.id}/edit`} state={state}>Edit recipe</Link><button className="secondary" onClick={() => { setError(''); dialog.current?.showModal(); cancel.current?.focus(); }}>Delete recipe</button>{source && <a href={source} target="_blank" rel="noopener noreferrer">View original recipe ↗</a>}</div>
     <div className="recipe-body"><section><h2>Ingredients</h2><ul className="ingredient-list">{[...recipe.ingredients].sort((a,b) => a.position-b.position).map(i => <li key={i.id}><strong>{i.name}</strong><span>{i.quantity === null ? 'As needed' : `${formatAmount(i.quantity)} ${i.unit}`}</span></li>)}</ul></section><section><h2>Let’s make it</h2><ol>{readSteps(recipe.instructions).map((step, index) => <li key={index}><strong>{step.name}</strong><p className="instructions">{step.description}</p></li>)}</ol></section></div>
     <CookingNotes key={`${owner}:${recipe.id}`} service={service.notes} recipeId={recipe.id}/>
     <dialog ref={dialog} aria-labelledby="delete-title" aria-describedby="delete-description" onCancel={e => { if (lock.current) e.preventDefault(); }}><h2 id="delete-title">Delete “{recipe.title}”?</h2><p id="delete-description">This removes the recipe, its ingredients, all its cooking notes, and planned meals from your cookbook.</p>{error && <p role="alert" className="error">{error}</p>}<div className="recipe-actions"><button ref={cancel} className="secondary" disabled={busy} onClick={() => dialog.current?.close()}>Keep recipe</button><button className="primary" disabled={busy} onClick={remove}>{busy ? 'Deleting…' : 'Yes, delete recipe'}</button></div></dialog>
