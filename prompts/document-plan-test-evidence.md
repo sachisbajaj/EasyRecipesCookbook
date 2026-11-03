@@ -1,0 +1,1 @@
+Use the existing PLAN.md privacy and dashboard tests. Temporarily break each feature locally, run its test, capture the failure, restore the implementation, then capture the passing run. Include the explanation, screenshots, and a realistic change that would break the test in its original PR.
