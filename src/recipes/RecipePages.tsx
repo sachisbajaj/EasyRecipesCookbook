@@ -1,3 +1,4 @@
+import { blankStep, readSteps } from './steps';
 import { CookingNotes } from '../notes/CookingNotes';
 import { readControls, selectRecipes, storeOptions } from './collection';
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
@@ -92,7 +93,7 @@ function Editor({ service, recipe }: { service: RecipeService; recipe?: Recipe }
   const [busy, setBusy] = useState(false);
   const lock = useRef(false); const active = useRef(true); const navigate = useNavigate();
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
-  function field(key: keyof Omit<RecipeDraft, 'ingredients'>, label: string, type = 'text') {
+  function field(key: keyof Omit<RecipeDraft, 'ingredients' | 'steps'>, label: string, type = 'text') {
     return <div><label htmlFor={key}>{label}</label><input id={key} type={type === 'number' ? 'text' : type} inputMode={type === 'number' ? 'numeric' : undefined} value={draft[key]} onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))} {...errorProps(key)}/>{errorMessage(key)}</div>;
   }
   async function submit(e: FormEvent) {
@@ -107,7 +108,27 @@ function Editor({ service, recipe }: { service: RecipeService; recipe?: Recipe }
   return <section className="recipe-editor"><p className="eyebrow">A LITTLE SOMETHING WORTH KEEPING</p><h1>{recipe ? 'Edit recipe' : 'Add a recipe'}</h1><p>Required: name, instructions, servings, and at least one ingredient. Everything else can wait.</p><form ref={form} onSubmit={submit} noValidate>
     <fieldset disabled={busy}><legend className="sr-only">Recipe details</legend>
       {field('title', 'Recipe name')}
-      <label htmlFor="instructions">Instructions</label><textarea id="instructions" rows={7} value={draft.instructions} onChange={e => setDraft(d => ({ ...d, instructions: e.target.value }))} {...errorProps('instructions')}/>{errorMessage('instructions')}
+      <h2>Cooking steps</h2>
+      <div className="step-row step-head">
+        <div>Step <details><summary aria-label="About the step name">ⓘ</summary><p>Give the action a short name, like “Toast the spices.”</p></details></div>
+        <div>Step description <details><summary aria-label="About the step description">ⓘ</summary><p>Explain how to do it. For example, “Stir the cumin in a dry skillet over medium heat for 30 seconds, until fragrant.”</p></details></div>
+      </div>
+      {draft.steps.map((step, index) => {
+        function changeStep(field: 'name' | 'description', value: string) {
+          setDraft(d => ({ ...d, steps: d.steps.map(row => row.key === step.key ? { ...row, [field]: value } : row) }));
+        }
+        return <div className="step-row" key={step.key}>
+          <div><input aria-label={`Step ${index + 1}`} placeholder="Toast the spices" value={step.name}
+            onChange={e => changeStep('name', e.target.value)} {...errorProps(step.key + '-name')}/>{errorMessage(step.key + '-name')}</div>
+          <div><textarea aria-label={`Step description ${index + 1}`} rows={2} placeholder="Stir the cumin in a dry skillet until fragrant."
+            value={step.description} onChange={e => changeStep('description', e.target.value)} {...errorProps(step.key + '-description')}/>{errorMessage(step.key + '-description')}
+            {draft.steps.length > 1 && <button type="button" className="secondary" aria-label={`Remove step ${index + 1}`}
+              onClick={() => setDraft(d => ({ ...d, steps: d.steps.filter(row => row.key !== step.key) }))}>Remove</button>}</div>
+        </div>;
+      })}
+      <button type="button" className="secondary" onClick={() => setDraft(d => ({ ...d, steps: [...d.steps, blankStep()] }))}>
+        <span className="step-plus" aria-hidden="true">+</span> Add step
+      </button>
       <div className="form-pair">{field('servings', 'Servings', 'number')}{field('minutes', 'Cooking time in minutes (optional)', 'number')}</div>
       <h2>Ingredients</h2><p className="muted">Use amounts like 1/4, 1 1/2, or 0.25. You can also enter 1/4 cup or 2 tbsp. Leave blank only for “as needed.” A unit included in the amount replaces the separate Unit value when saved.</p>
       {draft.ingredients.map((item, index) => <div className="ingredient-row" key={item.key}>{(['name', 'quantity', 'unit'] as const).map(key => <div key={key}><label htmlFor={`${item.key}-${key}`}>{key === 'name' ? 'Ingredient' : key === 'quantity' ? 'Amount' : 'Unit'} {index + 1}</label><input id={`${item.key}-${key}`} type="text" placeholder={key === 'quantity' ? 'e.g. 1/4' : undefined} value={item[key]} onChange={e => setDraft(d => ({ ...d, ingredients: d.ingredients.map(i => i.key === item.key ? { ...i, [key]: e.target.value } : i) }))} {...errorProps(`${item.key}-${key}`)}/>{errorMessage(`${item.key}-${key}`)}</div>)}<button type="button" className="secondary" aria-label={`Remove ingredient ${index + 1}`} onClick={() => { touch('ingredients'); setDraft(d => ({ ...d, ingredients: d.ingredients.filter(i => i.key !== item.key) })); }}>Remove</button></div>)}
@@ -132,7 +153,7 @@ function Detail({ recipe, service, owner }: Props & { recipe: Recipe }) {
   const source = safeSource(recipe.source_url);
   return <article className="recipe-detail"><Link to="/cookbook">← Your cookbook</Link><p className="eyebrow">{recipe.store || 'FROM YOUR KITCHEN'}</p><h1>{recipe.title}</h1><p className="recipe-meta">{recipe.servings} servings{recipe.minutes !== null && ` · ${recipe.minutes} min`} · {recipe.rating === null ? 'Not rated yet' : `${recipe.rating} / 5`}</p>
     <div className="recipe-actions"><StarButton recipe={recipe} service={service} owner={owner}/><Link className="secondary button-link" to={`/cookbook/${recipe.id}/edit`}>Edit recipe</Link><button className="secondary" onClick={() => { setError(''); dialog.current?.showModal(); cancel.current?.focus(); }}>Delete recipe</button>{source && <a href={source} target="_blank" rel="noopener noreferrer">View original recipe ↗</a>}</div>
-    <div className="recipe-body"><section><h2>Ingredients</h2><ul className="ingredient-list">{[...recipe.ingredients].sort((a,b) => a.position-b.position).map(i => <li key={i.id}><strong>{i.name}</strong><span>{i.quantity === null ? 'As needed' : `${formatAmount(i.quantity)} ${i.unit}`}</span></li>)}</ul></section><section><h2>Let’s make it</h2><p className="instructions">{recipe.instructions}</p></section></div>
+    <div className="recipe-body"><section><h2>Ingredients</h2><ul className="ingredient-list">{[...recipe.ingredients].sort((a,b) => a.position-b.position).map(i => <li key={i.id}><strong>{i.name}</strong><span>{i.quantity === null ? 'As needed' : `${formatAmount(i.quantity)} ${i.unit}`}</span></li>)}</ul></section><section><h2>Let’s make it</h2><ol>{readSteps(recipe.instructions).map((step, index) => <li key={index}><strong>{step.name}</strong><p className="instructions">{step.description}</p></li>)}</ol></section></div>
     <CookingNotes key={`${owner}:${recipe.id}`} service={service.notes} recipeId={recipe.id}/>
     <dialog ref={dialog} aria-labelledby="delete-title" aria-describedby="delete-description" onCancel={e => { if (lock.current) e.preventDefault(); }}><h2 id="delete-title">Delete “{recipe.title}”?</h2><p id="delete-description">This removes the recipe, its ingredients, all its cooking notes, and planned meals from your cookbook.</p>{error && <p role="alert" className="error">{error}</p>}<div className="recipe-actions"><button ref={cancel} className="secondary" disabled={busy} onClick={() => dialog.current?.close()}>Keep recipe</button><button className="primary" disabled={busy} onClick={remove}>{busy ? 'Deleting…' : 'Yes, delete recipe'}</button></div></dialog>
   </article>;
