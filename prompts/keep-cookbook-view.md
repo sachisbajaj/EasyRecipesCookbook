@@ -1,0 +1,1 @@
+Fix the recipe detail page’s “← Your cookbook” link so it returns to the same All recipes or Starred list, with the search, store filter, and sort still applied. Keep that context through editing or refreshing the recipe. Recipes opened from a direct link should still return to All recipes. Reproduce the bug and test the fix.

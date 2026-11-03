@@ -53,6 +53,11 @@ test('recipe workflow, failed save, deletion cancellation, and mobile layout wit
   await page.getByRole('link',{name:'Your cookbook'}).click();
   await page.getByLabel('Search titles').fill('  CRISPY '); await page.getByLabel('Store or source',{exact:true}).selectOption('store:trader joe’s'); await page.getByLabel('Sort recipes').selectOption('rating');
   await page.reload(); await expect(page.getByLabel('Search titles')).toHaveValue('  CRISPY '); await expect(page.getByLabel('Sort recipes')).toHaveValue('rating'); await expect(page.getByRole('link',{name:/Crispy gnocchi/})).toBeVisible();
+  await page.getByRole('link',{name:/Crispy gnocchi/}).click();
+  await page.reload();
+  await page.getByRole('link',{name:/Your cookbook/}).click();
+  await expect(page.getByLabel('Search titles')).toHaveValue('  CRISPY ');
+  await expect(page.getByLabel('Sort recipes')).toHaveValue('rating');
   await page.getByLabel('Sort recipes').selectOption('time'); await page.goBack(); await expect(page.getByLabel('Sort recipes')).toHaveValue('rating'); await page.goForward(); await expect(page.getByLabel('Sort recipes')).toHaveValue('time');
   await page.getByLabel('Search titles').fill('missing [title]'); await expect(page.getByText('No recipes match these controls.')).toBeVisible(); await page.getByRole('button',{name:'Reset controls'}).click(); await expect(page.getByLabel('Search titles')).toHaveValue('');
   await page.setViewportSize({width:390,height:844}); await page.screenshot({path:'test-results/recipe-controls-mobile.png',fullPage:true}); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); await page.setViewportSize({width:1280,height:900});
