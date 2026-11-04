@@ -1,0 +1,1 @@
+Update README.md with the live URL https://easy-recipes-cookbook.replit.app and the features already implemented. Correct outdated statements about future features, missing hosting, and Vercel as the active host. Document the published Supabase callback without claiming unverified live tests have passed. Preserve the setup and testing instructions. Open a linked PR for review.
