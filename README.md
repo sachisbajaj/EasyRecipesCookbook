@@ -2,7 +2,11 @@
 
 A place to record easy weeknight recipes and keep track of ingredients for a grocery list.
 
-The current app supports email/password signup, confirmation, login, session restoration, and logout, and a private recipe collection. You can add, view, edit, rate, and delete recipes with ingredients and source links. The remaining features in PLAN.md are planned next. There is no hosted app URL yet.
+**Live app:** [EasyRecipesCookbook](https://easy-recipes-cookbook.replit.app)
+
+Create an account to keep a private cookbook. Add, view, edit, rate, and delete recipes with ingredients, named cooking steps, and source links. Star favorites, search and filter your recipes, view dashboard statistics, keep dated cooking notes, plan meals, and generate an editable weekly grocery list.
+
+Built with React, TypeScript, Vite, React Router, and Recharts. Supabase provides authentication and PostgreSQL storage; Replit hosts the published website.
 
 ## Run locally
 
@@ -27,7 +31,7 @@ These client settings are public; database row-level security protects records. 
 
 The Replit Run command starts Vite on `0.0.0.0` so the preview can reach it. Publishing builds the existing Vite app as a static site from `dist`; a route rewrite serves `index.html` for paths such as `/login`, `/signup`, `/auth/callback`, and `/cookbook`.
 
-Before publishing, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to Replit Secrets so they are available during the build. These are browser configuration values; never use a Supabase service-role key in the frontend. After publishing, add the published site's exact HTTPS `/auth/callback` URL to Supabase Authentication's allowed redirect URLs. Replit provides the stable published website address when you publish the app.
+Before publishing, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to Replit Secrets so they are available during the build. These are browser configuration values; never use a Supabase service-role key in the frontend. For this published app, set the Supabase Site URL to `https://easy-recipes-cookbook.replit.app` and add `https://easy-recipes-cookbook.replit.app/auth/callback` to the allowed redirect URLs.
 
 ## Configure development Supabase
 
@@ -40,18 +44,18 @@ Before publishing, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` t
    - `supabase/migrations/20261030000100_cooking_notes.sql`
    - `supabase/migrations/20261031000100_meal_planning.sql`
    - `supabase/migrations/20261031000200_grocery_lists.sql`
-3. Under Authentication URL Configuration, set the local Site URL to `http://localhost:5173` and add both `http://localhost:5173/auth/callback` and `http://127.0.0.1:5173/auth/callback` to allowed redirects. Add the exact production HTTPS callback when a domain is available.
+3. Under Authentication URL Configuration, set the local Site URL to `http://localhost:5173` and add both `http://localhost:5173/auth/callback` and `http://127.0.0.1:5173/auth/callback` to allowed redirects. For the published project, use the Site URL and callback listed in the Replit section above.
 4. Keep the signup confirmation template using Supabase's `{{ .ConfirmationURL }}` link. The app passes its current origin plus `/auth/callback` when signing up. The browser client uses Supabase's implicit flow to process the returned session; the app then routes to `/cookbook` and removes tokens from the URL. Invalid/expired links show recovery guidance without displaying raw URL errors.
 5. For external testers, configure and verify email delivery/SMTP. Default provider email restrictions and limits can prevent delivery; never claim the confirmation flow is live until a real email has been received and followed.
 
 The second migration creates profiles through a trigger when Auth creates an account, backfills missing profiles without overwriting existing names, and removes browser permission to insert profiles manually. Accounts that are not yet email-confirmed may have a profile, but cannot access another user's data. See `schema.md` for the relationship and policies.
 
-No migration has been applied to a hosted project as part of this implementation. Do not run test fixture SQL against a real Supabase project.
+The local test suite creates an isolated database. Apply the migrations to any new Supabase project before using the app; test fixture SQL belongs only in the isolated test environment.
 
 ## Tests and build
 
 ```sh
-pnpm test           # 22 database tests and 60 UI tests
+pnpm test           # database and UI tests
 pnpm build          # TypeScript checks and production bundle
 pnpm exec playwright install chromium
 pnpm test:browser   # 8 browser flows; local server started automatically
@@ -115,7 +119,7 @@ The dashboard reuses owner-scoped paginated recipe reads and existing RLS; it ad
 
 `src/recipes` contains the collection, editor, detail page, validation, and database adapter; `src/auth` manages session state and auth operations; `src/lib/supabase.ts` configures the client; `src/App.tsx` defines screens/routes; `supabase/migrations` tracks schema changes. Supabase supplies authentication and PostgreSQL. React, TypeScript, Vite, and React Router provide the interface. See PLAN.md for the full product design.
 
-Run `pnpm build` and serve `dist`. `vercel.json` supplies an SPA fallback for direct URLs, including `/auth/callback`. Set the public Supabase variables in the host before building and allow its callback URL in Supabase. Logout uses local scope to sign out the current browser, leaving other devices signed in.
+Run `pnpm build` and serve `dist`. Replit's publishing configuration supplies the route fallback for direct URLs, including `/auth/callback`. Set the public Supabase variables before building and allow the published callback URL in Supabase. Logout uses local scope to sign out the current browser, leaving other devices signed in.
 
 References: [Supabase React authentication](https://supabase.com/docs/guides/auth/quickstarts/react), [password authentication](https://supabase.com/docs/guides/auth/passwords), and [user profile triggers](https://supabase.com/docs/guides/auth/managing-user-data).
 
